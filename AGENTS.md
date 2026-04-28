@@ -1,17 +1,28 @@
 # gameboy-share
 
-Collaborative Gameboy-style input pad. Multiple visitors share the same game session by pressing buttons that forward to an upstream service (`toy.cloudreve.org`).
+Collaborative Gameboy-style input pad. Multiple visitors share the same running game session by pressing buttons that forward to an upstream service.
+
+**Live:** https://etok.zo.space/gameboy-share
 
 ## Routes
 
-- `/gameboy-share` — UI page with D-pad + A/B/Select/Start buttons
-- `/api/gameboy-share-state` — Returns current event log and upstream URL
-- `/api/gameboy-share-input` — POST button press; forwards to toy.cloudreve.org
+| Path | Type | Description |
+|------|------|-------------|
+| `/gameboy-share` | page | Interactive pad UI with live screen feed |
+| `/api/gameboy-share-state` | api | GET recent button events |
+| `/api/gameboy-share-input` | api | POST a button press → upstream service |
 
 ## State
 
-In-memory only. Resets on server restart.
+- In-memory global store keyed `__gameboy_share_state`
+- Keeps last 80 events; resets on server restart
 
 ## Upstream
 
-`https://toy.cloudreve.org/control` — handles the actual game simulation.
+Buttons forward to: `https://toy.cloudreve.org/control`
+
+## Sync
+
+- Routes live at: https://github.com/EthanThatOneKid/gameboy-share
+- Export from zo.space → `bun export.ts --name gameboy-share`
+- Import to zo.space → `bun import.ts` (from repo root)

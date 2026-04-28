@@ -4,18 +4,16 @@ Collaborative Gameboy-style input pad on Zo Space. Multiple visitors share the s
 
 **Live:** https://etok.zo.space/gameboy-share
 
+## How it works
+
+- Press any button (0–7) to send an input event
+- Events are broadcast via the state endpoint
+- The upstream service (`toy.cloudreve.org`) drives the actual game state
+
 ## Routes
 
 | Path | Type | Description |
-|---|---|---|
-| `/gameboy-share` | page | D-pad + A/B/Select/Start controls + live event log |
-| `/api/gameboy-share-state` | api | Returns event log + upstream stream URL |
-| `/api/gameboy-share-input` | api | POST a button press → forwarded to toy.cloudreve.org |
-
-## Upstream
-
-The actual game simulation runs at `https://toy.cloudreve.org`. This Space acts as the relay and shared event bus.
-
-## Secrets
-
-None required.
+|------|------|-------------|
+| `/gameboy-share` | page | Interactive pad UI |
+| `/api/gameboy-share-state` | api | GET recent button events |
+| `/api/gameboy-share-input` | api | POST a button press |

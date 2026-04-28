@@ -104,14 +104,14 @@ export default function GameboySharePage() {
               <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-400">Live Activity</h2>
               <p className="text-xs text-zinc-500 mt-1">Last update: {new Date(updatedAt).toLocaleTimeString()}</p>
               <div className="mt-3 max-h-64 overflow-auto space-y-1">
-                {events.length === 0 ? (
-                  <p className="text-sm text-zinc-500">No recent input yet.</p>
-                ) : events.map((e, i) => (
-                  <div key={`${e.timestamp}-${i}`} className="text-sm text-zinc-300 flex justify-between gap-3 border-b border-white/5 pb-1">
-                    <span>{buttonName(e.button)} by {e.user}</span>
-                    <span className="text-zinc-500">{new Date(e.timestamp).toLocaleTimeString()}</span>
-                  </div>
-                ))}
+                {events.length === 0 ? <p className="text-sm text-zinc-500">No recent input yet.</p> :
+                  events.map((e, i) => (
+                    <div key={`${e.timestamp}-${i}`} className="text-sm text-zinc-300 flex justify-between gap-3 border-b border-white/5 pb-1">
+                      <span>{buttonName(e.button)} by {e.user}</span>
+                      <span className="text-zinc-500">{new Date(e.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                  ))
+                }
               </div>
             </div>
           </div>
