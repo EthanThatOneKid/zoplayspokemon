@@ -19,6 +19,10 @@ A collaborative Gameboy-style input pad running on Zo Space. Multiple visitors s
 3. The API forwards the press to the upstream game service (`toy.cloudreve.org`)
 4. State is updated globally and the UI polls `/api/gameboy-share-state` every 1.2s
 
+## Upstream
+
+The upstream game server is powered by [HFO4/gameboy live](https://github.com/HFO4/gameboy-live) — a Gameboy emulator written in Go that exposes keyboard controls over HTTP. The live stream is rendered at `https://toy.cloudreve.org/image`.
+
 ## API Reference
 
 ### `GET /api/gameboy-share-state`
@@ -52,6 +56,7 @@ Returns `{ "ok": true, "event": { ... } }` on success, or `{ "error": "..." }` o
 ## Tech
 
 - **Framework:** Zo Space (Hono + React on Bun)
+- **Upstream game:** [HFO4/gameboy-live](https://github.com/HFO4/gameboy-live) — Go Gameboy emulator with HTTP control endpoint
 - **State:** In-memory global on the Bun server (resets on restart)
 - **Styling:** Tailwind CSS 4
 
