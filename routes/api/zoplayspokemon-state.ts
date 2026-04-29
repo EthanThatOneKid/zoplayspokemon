@@ -9,6 +9,7 @@ type InputEvent = {
 
 type ShareState = {
   events: InputEvent[];
+  frameHash: string;
   frameVersion: number;
   heldButtons: string[];
   inputVersion: number;
@@ -20,6 +21,7 @@ type ShareState = {
 
 type RoomInfo = {
   acceptedInputVersion?: number;
+  frameHash?: string;
   heldButtons?: unknown;
   lastFrameAt?: number;
   lastInputAt?: number;
@@ -40,6 +42,7 @@ function getState(room: string): ShareState {
   if (!g[KEY]![room]) {
     g[KEY]![room] = {
       events: [],
+      frameHash: "",
       frameVersion: 0,
       heldButtons: [],
       inputVersion: 0,
@@ -78,9 +81,11 @@ function applyRoomInfo(state: ShareState, info: RoomInfo | undefined): boolean {
   const nextLastInputAt = readNumber(info.lastInputAt, state.lastInputAt);
   const nextLastFrameAt = readNumber(info.lastFrameAt, state.lastFrameAt);
   const nextQueueDepth = readNumber(info.queueDepth, state.queueDepth);
+  const nextFrameHash = typeof info.frameHash === "string" ? info.frameHash : state.frameHash;
   const nextHeldButtons = readButtons(info.heldButtons, state.heldButtons);
 
   const changed =
+    nextFrameHash !== state.frameHash ||
     nextInputVersion !== state.inputVersion ||
     nextFrameVersion !== state.frameVersion ||
     nextLastInputAt !== state.lastInputAt ||
@@ -90,6 +95,7 @@ function applyRoomInfo(state: ShareState, info: RoomInfo | undefined): boolean {
 
   if (!changed) return false;
 
+  state.frameHash = nextFrameHash;
   state.inputVersion = nextInputVersion;
   state.frameVersion = nextFrameVersion;
   state.lastInputAt = nextLastInputAt;
@@ -114,8 +120,15 @@ async function syncFromService(room: string, state: ShareState): Promise<boolean
   }
 }
 
-function hasFreshData(state: ShareState, sinceInputVersion: number, sinceFrameVersion: number, sinceUpdatedAt: number) {
+function hasFreshData(
+  state: ShareState,
+  sinceInputVersion: number,
+  sinceFrameVersion: number,
+  sinceUpdatedAt: number,
+  sinceFrameHash: string,
+) {
   return (
+    (sinceFrameHash ? state.frameHash !== sinceFrameHash : false) ||
     state.inputVersion > sinceInputVersion ||
     state.frameVersion > sinceFrameVersion ||
     state.updatedAt > sinceUpdatedAt
@@ -127,10 +140,12 @@ export default async (c: Context) => {
   const state = getState(room);
   const sinceInputVersion = Number(c.req.query("sinceInputVersion") || -1);
   const sinceFrameVersion = Number(c.req.query("sinceFrameVersion") || -1);
+  const sinceFrameHash = String(c.req.query("sinceFrameHash") || "");
   const sinceUpdatedAt = Number(c.req.query("sinceUpdatedAt") || 0);
   const hasSinceCursor =
     c.req.query("sinceInputVersion") !== undefined ||
     c.req.query("sinceFrameVersion") !== undefined ||
+    c.req.query("sinceFrameHash") !== undefined ||
     c.req.query("sinceUpdatedAt") !== undefined;
   const timeoutMs = clampTimeout(c.req.query("timeoutMs"), hasSinceCursor ? LONG_POLL_TIMEOUT_MS : 0);
   const deadline = Date.now() + timeoutMs;
@@ -139,7 +154,7 @@ export default async (c: Context) => {
 
   while (
     timeoutMs > 0 &&
-    !hasFreshData(state, sinceInputVersion, sinceFrameVersion, sinceUpdatedAt) &&
+    !hasFreshData(state, sinceInputVersion, sinceFrameVersion, sinceUpdatedAt, sinceFrameHash) &&
     Date.now() < deadline
   ) {
     await sleep(LONG_POLL_INTERVAL_MS);
@@ -162,6 +177,7 @@ export default async (c: Context) => {
     updatedAt: state.updatedAt,
     inputVersion: state.inputVersion,
     frameVersion: state.frameVersion,
+    frameHash: state.frameHash,
     queueDepth: state.queueDepth,
     heldButtons: state.heldButtons,
     lastInputAt: state.lastInputAt,

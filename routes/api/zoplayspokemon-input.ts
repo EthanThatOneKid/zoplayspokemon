@@ -9,6 +9,7 @@ type InputEvent = {
 
 type ShareState = {
   events: InputEvent[];
+  frameHash: string;
   frameVersion: number;
   heldButtons: string[];
   inputVersion: number;
@@ -20,6 +21,7 @@ type ShareState = {
 
 type UpstreamInputResponse = {
   acceptedInputVersion?: number;
+  frameHash?: string;
   heldButtons?: unknown;
   lastFrameAt?: number;
   lastInputAt?: number;
@@ -41,6 +43,7 @@ function getState(room: string): ShareState {
   if (!g[KEY]![room]) {
     g[KEY]![room] = {
       events: [],
+      frameHash: "",
       frameVersion: 0,
       heldButtons: [],
       inputVersion: 0,
@@ -100,9 +103,11 @@ export default async (c: Context) => {
 
     const nextInputVersion = readNumber(upstreamData?.acceptedInputVersion, state.inputVersion + 1);
     const nextFrameVersion = readNumber(upstreamData?.presentedFrameVersion, state.frameVersion);
+    const nextFrameHash = typeof upstreamData?.frameHash === "string" ? upstreamData.frameHash : state.frameHash;
     const nextLastInputAt = readNumber(upstreamData?.lastInputAt, timestamp);
     const nextLastFrameAt = readNumber(upstreamData?.lastFrameAt, state.lastFrameAt);
 
+    state.frameHash = nextFrameHash;
     state.inputVersion = Math.max(state.inputVersion, nextInputVersion);
     state.frameVersion = Math.max(state.frameVersion, nextFrameVersion);
     state.lastInputAt = Math.max(state.lastInputAt, nextLastInputAt);
@@ -117,6 +122,7 @@ export default async (c: Context) => {
       event,
       inputVersion: state.inputVersion,
       frameVersion: state.frameVersion,
+      frameHash: state.frameHash,
       queueDepth: state.queueDepth,
       heldButtons: state.heldButtons,
       updatedAt: state.updatedAt,

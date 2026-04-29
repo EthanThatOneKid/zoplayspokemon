@@ -299,6 +299,7 @@ export default function ZoPlaysPokemonPage() {
   const [keyboardEnabled, setKeyboardEnabled] = useState(false);
   const [frameLoading, setFrameLoading] = useState(true);
   const user = useMemo(() => Math.random().toString(36).slice(2, 8), []);
+  const frameHashRef = useRef("");
   const frameVersionRef = useRef(0);
   const inputVersionRef = useRef(0);
   const lastFrameAtRef = useRef(0);
@@ -348,6 +349,10 @@ export default function ZoPlaysPokemonPage() {
       const nextEtag = response.headers.get("etag");
       if (nextEtag) {
         frameEtagRef.current = nextEtag;
+      }
+      const nextFrameHash = response.headers.get("x-frame-hash");
+      if (nextFrameHash) {
+        frameHashRef.current = nextFrameHash;
       }
 
       const blob = await response.blob();
@@ -407,6 +412,7 @@ export default function ZoPlaysPokemonPage() {
     if (useCursor) {
       query.set("sinceInputVersion", String(inputVersionRef.current));
       query.set("sinceFrameVersion", String(frameVersionRef.current));
+      query.set("sinceFrameHash", frameHashRef.current);
       query.set("sinceUpdatedAt", String(updatedAtRef.current));
       query.set("timeoutMs", String(timeoutMs));
     }
@@ -518,10 +524,8 @@ export default function ZoPlaysPokemonPage() {
     }
 
     const nextFrameVersion = Number(data.frameVersion || 0);
-    const shouldRefreshForFrame =
-      Number.isFinite(nextFrameVersion) &&
-      nextFrameVersion > frameVersionRef.current &&
-      lastFrameAtRef.current !== Number(data.lastFrameAt || 0);
+    const nextFrameHash = typeof data.frameHash === "string" ? data.frameHash : "";
+    const shouldRefreshForFrame = Boolean(nextFrameHash && nextFrameHash !== frameHashRef.current);
     if (Number.isFinite(nextFrameVersion) && nextFrameVersion >= frameVersionRef.current) {
       frameVersionRef.current = nextFrameVersion;
       setFrameVersion(nextFrameVersion);
@@ -612,6 +616,7 @@ export default function ZoPlaysPokemonPage() {
     frameVersionRef.current = 0;
     inputVersionRef.current = 0;
     lastFrameAtRef.current = 0;
+    frameHashRef.current = "";
     frameEtagRef.current = null;
     frameFetchIdRef.current += 1;
     updatedAtRef.current = Date.now();
@@ -643,6 +648,7 @@ export default function ZoPlaysPokemonPage() {
   const recentLabel = pendingTapCode ? buttonName(pendingTapCode) : "Tap-ready";
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
+  const showFrameLoadingOverlay = frameLoading && (!frameSrc || visibleQueueCount > 0);
 
   return (
     <div className="zp-root min-h-screen">
@@ -703,9 +709,9 @@ export default function ZoPlaysPokemonPage() {
                   className="block h-full w-full bg-[#002020]"
                   style={{ imageRendering: "pixelated" }}
                 />
-                {frameLoading ? (
+                {showFrameLoadingOverlay ? (
                   <div className="pointer-events-none absolute inset-0 flex items-end justify-start bg-transparent p-3 text-[12px] text-[#c8c8a8]">
-                    <span className="zp-font-mono">LOADING FRAME…</span>
+                    <span className="zp-font-mono">{frameSrc ? "SYNCING FRAME…" : "LOADING FRAME…"}</span>
                   </div>
                 ) : null}
               </div>

@@ -11,9 +11,10 @@ export default async (c: Context) => {
   }
 
   const frameVersion = upstream.headers.get("x-frame-version") || "0";
+  const frameHash = upstream.headers.get("x-hash") || upstream.headers.get("etag")?.replace(/"/g, "") || "";
   const inputVersion = upstream.headers.get("x-input-version") || "0";
   const queueDepth = upstream.headers.get("x-queue-depth") || "0";
-  const etag = `"${room}:${frameVersion}"`;
+  const etag = frameHash ? `"${room}:${frameHash}"` : `"${room}:${frameVersion}"`;
 
   if (c.req.header("if-none-match") === etag) {
     return new Response(null, {
@@ -22,6 +23,7 @@ export default async (c: Context) => {
         ETag: etag,
         "Cache-Control": "private, no-cache, must-revalidate",
         Vary: "If-None-Match",
+        "X-Frame-Hash": frameHash,
         "X-Input-Version": inputVersion,
         "X-Frame-Version": frameVersion,
         "X-Queue-Depth": queueDepth,
@@ -36,6 +38,7 @@ export default async (c: Context) => {
       "Cache-Control": "private, no-cache, must-revalidate",
       ETag: etag,
       Vary: "If-None-Match",
+      "X-Frame-Hash": frameHash,
       "X-Input-Version": inputVersion,
       "X-Frame-Version": frameVersion,
       "X-Queue-Depth": queueDepth,
