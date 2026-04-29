@@ -58,6 +58,11 @@ const INPUT_TIMEOUT_MS = 6000;
 const MAX_QUEUE_DEPTH = 5;
 const LONG_POLL_TIMEOUT_MS = 20_000;
 const FALLBACK_REFRESH_MS = 10_000;
+const BURST_POLL_INTERVAL_MS = 140;
+const BURST_SETTLE_REFRESH_MS = 180;
+const BURST_WINDOW_FAST_MS = 800;
+const BURST_WINDOW_SLOW_MS = 1200;
+const BURST_WINDOW_HOLD_MS = 600;
 
 const BUTTON_LOOKUP = Object.fromEntries(BUTTONS.map((button) => [button.code, button])) as Record<string, ButtonDef>;
 
@@ -317,6 +322,8 @@ export default function ZoPlaysPokemonPage() {
   const pendingTimeoutRef = useRef<number | null>(null);
   const frameLoadingRef = useRef(true);
   const updatedAtRef = useRef(Date.now());
+  const burstPollIdRef = useRef(0);
+  const roomRef = useRef("main");
 
   const visibleQueueCount = Math.max(queueCount, queueDepth);
   const controlsDisabled = visibleQueueCount > 0;
@@ -326,6 +333,13 @@ export default function ZoPlaysPokemonPage() {
     frameLoadingRef.current = true;
     setFrameLoading(true);
     setFrameNonce(Date.now());
+  };
+
+  const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  const burstWindowMsFor = (code: string, action: "tap" | "press" | "release") => {
+    if (action !== "tap") return BURST_WINDOW_HOLD_MS;
+    return ["4", "5", "6", "7"].includes(code) ? BURST_WINDOW_SLOW_MS : BURST_WINDOW_FAST_MS;
   };
 
   const syncActiveCodes = () => {
@@ -359,6 +373,56 @@ export default function ZoPlaysPokemonPage() {
     setError(message);
   };
 
+  const fetchState = async (nextRoom: string, useCursor: boolean, timeoutMs: number) => {
+    const query = new URLSearchParams({ room: nextRoom });
+    if (useCursor) {
+      query.set("sinceInputVersion", String(inputVersionRef.current));
+      query.set("sinceFrameVersion", String(frameVersionRef.current));
+      query.set("sinceUpdatedAt", String(updatedAtRef.current));
+      query.set("timeoutMs", String(timeoutMs));
+    }
+
+    const res = await fetch(`/api/zoplayspokemon-state?${query.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, unknown>;
+    applyState(data);
+    return data;
+  };
+
+  const runBurstPoll = (expectedInputVersion: number, code: string, action: "tap" | "press" | "release") => {
+    const burstId = burstPollIdRef.current + 1;
+    burstPollIdRef.current = burstId;
+
+    void (async () => {
+      const deadline = Date.now() + burstWindowMsFor(code, action);
+      let sawPresentedFrame = frameVersionRef.current >= expectedInputVersion;
+
+      while (!sawPresentedFrame && burstPollIdRef.current === burstId && Date.now() < deadline) {
+        try {
+          await fetchState(roomRef.current, true, 0);
+        } catch {
+        }
+
+        sawPresentedFrame = frameVersionRef.current >= expectedInputVersion;
+        if (!sawPresentedFrame) {
+          await sleep(BURST_POLL_INTERVAL_MS);
+        }
+      }
+
+      if (!sawPresentedFrame || burstPollIdRef.current !== burstId) return;
+
+      await sleep(BURST_SETTLE_REFRESH_MS);
+      if (burstPollIdRef.current !== burstId) return;
+      refreshFrame();
+
+      await sleep(BURST_SETTLE_REFRESH_MS);
+      if (burstPollIdRef.current !== burstId) return;
+      refreshFrame();
+    })();
+  };
+
   const sendInput = async (code: string, action: "tap" | "press" | "release") => {
     notePendingInput();
     try {
@@ -388,7 +452,7 @@ export default function ZoPlaysPokemonPage() {
       if (Array.isArray(data.heldButtons)) {
         setHeldCodes(data.heldButtons.filter((button): button is string => typeof button === "string"));
       }
-      refreshFrame();
+      runBurstPoll(Math.max(nextInputVersion, inputVersionRef.current), code, action);
       return true;
     } catch {
       failInput("Network issue while sending input");
@@ -493,38 +557,24 @@ export default function ZoPlaysPokemonPage() {
   }, [frameLoading]);
 
   useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
+
+  useEffect(() => {
     let active = true;
     const params = new URLSearchParams(window.location.search);
     const nextRoom = (params.get("room") || "main").slice(0, 32) || "main";
     setRoom(nextRoom);
 
-    const loadState = async (useCursor: boolean) => {
-      const query = new URLSearchParams({ room: nextRoom });
-      if (useCursor) {
-        query.set("sinceInputVersion", String(inputVersionRef.current));
-        query.set("sinceFrameVersion", String(frameVersionRef.current));
-        query.set("sinceUpdatedAt", String(updatedAtRef.current));
-        query.set("timeoutMs", String(LONG_POLL_TIMEOUT_MS));
-      }
-
-      const res = await fetch(`/api/zoplayspokemon-state?${query.toString()}`, {
-        headers: { Accept: "application/json" },
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!active) return;
-      applyState(data);
-    };
-
     const run = async () => {
       try {
-        await loadState(false);
+        await fetchState(nextRoom, false, 0);
       } catch {
       }
 
       while (active) {
         try {
-          await loadState(true);
+          await fetchState(nextRoom, true, LONG_POLL_TIMEOUT_MS);
         } catch {
           await new Promise((resolve) => window.setTimeout(resolve, 1000));
         }
@@ -597,6 +647,7 @@ export default function ZoPlaysPokemonPage() {
   }, [keyboardEnabled, room]);
 
   useEffect(() => {
+    burstPollIdRef.current += 1;
     frameVersionRef.current = 0;
     inputVersionRef.current = 0;
     lastFrameAtRef.current = 0;
