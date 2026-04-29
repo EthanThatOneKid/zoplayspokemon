@@ -100,6 +100,10 @@ def get_room(name: str) -> dict:
                 "tap_queue": [],
                 "running": False,
                 "worker": None,
+                "input_version": 0,
+                "frame_version": 0,
+                "last_input_at": 0,
+                "last_frame_at": 0,
             }
         return rooms[room_name]
 
@@ -137,6 +141,9 @@ def room_loop(room: dict) -> None:
                     next_tap_frames[button] = frames_left - 1
             room["tap_frames"] = next_tap_frames
             room["latest_frame"] = render_frame(pyboy)
+            if room["frame_version"] < room["input_version"]:
+                room["frame_version"] = room["input_version"]
+                room["last_frame_at"] = int(time.time() * 1000)
 
         time.sleep(frame_delay)
 
@@ -160,6 +167,7 @@ def init_room(room: dict) -> None:
     room["ticks"] = WARMUP_FRAMES
     room["pyboy"] = pyboy
     room["latest_frame"] = render_frame(pyboy)
+    room["last_frame_at"] = int(time.time() * 1000)
     room["running"] = True
 
     worker = threading.Thread(target=room_loop, args=(room,), daemon=True, name=f"room-{room['name']}")
@@ -189,11 +197,18 @@ def queue_input(room: dict, raw_button: str, raw_action: str) -> dict:
             room["tap_frames"].pop(button, None)
             room["tap_queue"] = [queued for queued in room["tap_queue"] if queued != button]
 
+        room["input_version"] += 1
+        room["last_input_at"] = int(time.time() * 1000)
+
         return {
             "button": button,
             "action": action,
             "queueDepth": len(room["tap_queue"]),
             "heldButtons": sorted(room["desired_buttons"]),
+            "acceptedInputVersion": room["input_version"],
+            "presentedFrameVersion": room["frame_version"],
+            "lastInputAt": room["last_input_at"],
+            "lastFrameAt": room["last_frame_at"],
         }
 
 
@@ -237,6 +252,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Expires", "0")
                 self.send_header("X-Room", room["name"])
                 self.send_header("X-Ticks", str(room["ticks"]))
+                self.send_header("X-Input-Version", str(room["input_version"]))
+                self.send_header("X-Frame-Version", str(room["frame_version"]))
+                self.send_header("X-Queue-Depth", str(len(room["tap_queue"])))
                 self.send_header("Content-Length", str(len(frame)))
                 self.end_headers()
                 self.wfile.write(frame)
@@ -275,6 +293,10 @@ class Handler(BaseHTTPRequestHandler):
                         "has_rom": room["pyboy"] is not None,
                         "queueDepth": len(room["tap_queue"]),
                         "heldButtons": sorted(room["desired_buttons"]),
+                        "acceptedInputVersion": room["input_version"],
+                        "presentedFrameVersion": room["frame_version"],
+                        "lastInputAt": room["last_input_at"],
+                        "lastFrameAt": room["last_frame_at"],
                     }
                     for name, room in rooms.items()
                 }

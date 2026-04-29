@@ -17,6 +17,9 @@ export default async (c: Context) => {
       "Cache-Control": "no-cache, no-store, must-revalidate",
       Pragma: "no-cache",
       Expires: "0",
+      "X-Input-Version": upstream.headers.get("x-input-version") || "0",
+      "X-Frame-Version": upstream.headers.get("x-frame-version") || "0",
+      "X-Queue-Depth": upstream.headers.get("x-queue-depth") || "0",
     },
   });
 };
