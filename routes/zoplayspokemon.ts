@@ -60,9 +60,7 @@ const LONG_POLL_TIMEOUT_MS = 20_000;
 const FALLBACK_REFRESH_MS = 10_000;
 const BURST_POLL_INTERVAL_MS = 140;
 const BURST_SETTLE_REFRESH_MS = 180;
-const BURST_WINDOW_FAST_MS = 800;
-const BURST_WINDOW_SLOW_MS = 1200;
-const BURST_WINDOW_HOLD_MS = 600;
+const BURST_WINDOW_MS = 1200;
 
 const BUTTON_LOOKUP = Object.fromEntries(BUTTONS.map((button) => [button.code, button])) as Record<string, ButtonDef>;
 
@@ -337,11 +335,6 @@ export default function ZoPlaysPokemonPage() {
 
   const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-  const burstWindowMsFor = (code: string, action: "tap" | "press" | "release") => {
-    if (action !== "tap") return BURST_WINDOW_HOLD_MS;
-    return ["4", "5", "6", "7"].includes(code) ? BURST_WINDOW_SLOW_MS : BURST_WINDOW_FAST_MS;
-  };
-
   const syncActiveCodes = () => {
     setActiveCodes(Array.from(activeCodesRef.current.values()).sort());
   };
@@ -391,12 +384,12 @@ export default function ZoPlaysPokemonPage() {
     return data;
   };
 
-  const runBurstPoll = (expectedInputVersion: number, code: string, action: "tap" | "press" | "release") => {
+  const runBurstPoll = (expectedInputVersion: number) => {
     const burstId = burstPollIdRef.current + 1;
     burstPollIdRef.current = burstId;
 
     void (async () => {
-      const deadline = Date.now() + burstWindowMsFor(code, action);
+      const deadline = Date.now() + BURST_WINDOW_MS;
       let sawPresentedFrame = frameVersionRef.current >= expectedInputVersion;
 
       while (!sawPresentedFrame && burstPollIdRef.current === burstId && Date.now() < deadline) {
@@ -452,7 +445,7 @@ export default function ZoPlaysPokemonPage() {
       if (Array.isArray(data.heldButtons)) {
         setHeldCodes(data.heldButtons.filter((button): button is string => typeof button === "string"));
       }
-      runBurstPoll(Math.max(nextInputVersion, inputVersionRef.current), code, action);
+      runBurstPoll(Math.max(nextInputVersion, inputVersionRef.current));
       return true;
     } catch {
       failInput("Network issue while sending input");
