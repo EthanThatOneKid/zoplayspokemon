@@ -10,16 +10,35 @@ export default async (c: Context) => {
     return c.text("Frame unavailable", 502);
   }
 
+  const frameVersion = upstream.headers.get("x-frame-version") || "0";
+  const inputVersion = upstream.headers.get("x-input-version") || "0";
+  const queueDepth = upstream.headers.get("x-queue-depth") || "0";
+  const etag = `"${room}:${frameVersion}"`;
+
+  if (c.req.header("if-none-match") === etag) {
+    return new Response(null, {
+      status: 304,
+      headers: {
+        ETag: etag,
+        "Cache-Control": "private, no-cache, must-revalidate",
+        Vary: "If-None-Match",
+        "X-Input-Version": inputVersion,
+        "X-Frame-Version": frameVersion,
+        "X-Queue-Depth": queueDepth,
+      },
+    });
+  }
+
   return new Response(upstream.body, {
     status: upstream.status,
     headers: {
       "Content-Type": upstream.headers.get("content-type") || "image/png",
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      Pragma: "no-cache",
-      Expires: "0",
-      "X-Input-Version": upstream.headers.get("x-input-version") || "0",
-      "X-Frame-Version": upstream.headers.get("x-frame-version") || "0",
-      "X-Queue-Depth": upstream.headers.get("x-queue-depth") || "0",
+      "Cache-Control": "private, no-cache, must-revalidate",
+      ETag: etag,
+      Vary: "If-None-Match",
+      "X-Input-Version": inputVersion,
+      "X-Frame-Version": frameVersion,
+      "X-Queue-Depth": queueDepth,
     },
   });
 };

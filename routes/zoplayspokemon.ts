@@ -299,7 +299,7 @@ export default function ZoPlaysPokemonPage() {
   const [events, setEvents] = useState<InputEvent[]>([]);
   const [updatedAt, setUpdatedAt] = useState<number>(Date.now());
   const [error, setError] = useState("");
-  const [frameNonce, setFrameNonce] = useState<number>(Date.now());
+  const [frameRequestId, setFrameRequestId] = useState(0);
   const [frameVersion, setFrameVersion] = useState(0);
   const [heldCodes, setHeldCodes] = useState<string[]>([]);
   const [inputVersion, setInputVersion] = useState(0);
@@ -330,7 +330,7 @@ export default function ZoPlaysPokemonPage() {
     if (frameLoadingRef.current) return;
     frameLoadingRef.current = true;
     setFrameLoading(true);
-    setFrameNonce(Date.now());
+    setFrameRequestId((current) => current + 1);
   };
 
   const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -654,10 +654,10 @@ export default function ZoPlaysPokemonPage() {
     clearPendingInput();
     frameLoadingRef.current = true;
     setFrameLoading(true);
-    setFrameNonce(Date.now());
+    setFrameRequestId((current) => current + 1);
   }, [room]);
 
-  const imageUrl = `/api/zoplayspokemon-frame?room=${encodeURIComponent(room)}&t=${frameNonce}`;
+  const imageUrl = `/api/zoplayspokemon-frame?room=${encodeURIComponent(room)}`;
   const heldLabel = heldCodes.length
     ? heldCodes.map(buttonName).join(", ")
     : activeCodes.length
@@ -719,6 +719,7 @@ export default function ZoPlaysPokemonPage() {
               </div>
               <div className="relative aspect-[10/9] overflow-hidden rounded-[16px] border border-[#608080] bg-[#002020]">
                 <img
+                  key={`${room}:${frameRequestId}`}
                   src={imageUrl}
                   alt="Shared game screen"
                   loading="eager"
