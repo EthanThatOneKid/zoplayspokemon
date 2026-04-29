@@ -288,7 +288,7 @@ export default function ZoPlaysPokemonPage() {
   const [events, setEvents] = useState<InputEvent[]>([]);
   const [updatedAt, setUpdatedAt] = useState<number>(Date.now());
   const [error, setError] = useState("");
-  const [frameRequestId, setFrameRequestId] = useState(0);
+  const [frameSrc, setFrameSrc] = useState("");
   const [frameVersion, setFrameVersion] = useState(0);
   const [inputVersion, setInputVersion] = useState(0);
   const [lastFrameAt, setLastFrameAt] = useState(0);
@@ -307,15 +307,70 @@ export default function ZoPlaysPokemonPage() {
   const updatedAtRef = useRef(Date.now());
   const burstPollIdRef = useRef(0);
   const roomRef = useRef("main");
+  const frameEtagRef = useRef<string | null>(null);
+  const frameObjectUrlRef = useRef<string | null>(null);
+  const frameFetchIdRef = useRef(0);
 
   const visibleQueueCount = Math.max(queueCount, queueDepth);
   const controlsDisabled = visibleQueueCount > 0;
 
-  const refreshFrame = () => {
-    if (frameLoadingRef.current) return;
+  const refreshFrame = async (force = false) => {
+    if (frameLoadingRef.current && !force) return;
     frameLoadingRef.current = true;
     setFrameLoading(true);
-    setFrameRequestId((current) => current + 1);
+
+    const requestId = frameFetchIdRef.current + 1;
+    frameFetchIdRef.current = requestId;
+
+    try {
+      const headers: Record<string, string> = { Accept: "image/png" };
+      if (frameEtagRef.current) {
+        headers["If-None-Match"] = frameEtagRef.current;
+      }
+
+      const response = await fetch(`/api/zoplayspokemon-frame?room=${encodeURIComponent(roomRef.current)}`, {
+        headers,
+        cache: "no-cache",
+      });
+
+      if (frameFetchIdRef.current !== requestId) return;
+
+      if (response.status === 304) {
+        frameLoadingRef.current = false;
+        setFrameLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Frame feed unavailable");
+      }
+
+      const nextEtag = response.headers.get("etag");
+      if (nextEtag) {
+        frameEtagRef.current = nextEtag;
+      }
+
+      const blob = await response.blob();
+      if (frameFetchIdRef.current !== requestId) return;
+
+      const nextUrl = URL.createObjectURL(blob);
+      const previousUrl = frameObjectUrlRef.current;
+      frameObjectUrlRef.current = nextUrl;
+      setFrameSrc(nextUrl);
+      if (previousUrl) {
+        URL.revokeObjectURL(previousUrl);
+      }
+
+      frameLoadingRef.current = false;
+      setFrameLoading(false);
+      clearPendingInput();
+    } catch {
+      if (frameFetchIdRef.current !== requestId) return;
+      frameLoadingRef.current = false;
+      setFrameLoading(false);
+      clearPendingInput();
+      setError("Frame feed unavailable");
+    }
   };
 
   const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -517,9 +572,7 @@ export default function ZoPlaysPokemonPage() {
 
     void run();
     const fallback = window.setInterval(() => {
-      if (!frameLoadingRef.current) {
-        refreshFrame();
-      }
+      void refreshFrame();
     }, FALLBACK_REFRESH_MS);
 
     return () => {
@@ -559,8 +612,15 @@ export default function ZoPlaysPokemonPage() {
     frameVersionRef.current = 0;
     inputVersionRef.current = 0;
     lastFrameAtRef.current = 0;
+    frameEtagRef.current = null;
+    frameFetchIdRef.current += 1;
     updatedAtRef.current = Date.now();
     setEvents([]);
+    if (frameObjectUrlRef.current) {
+      URL.revokeObjectURL(frameObjectUrlRef.current);
+      frameObjectUrlRef.current = null;
+    }
+    setFrameSrc("");
     setFrameVersion(0);
     setInputVersion(0);
     setLastFrameAt(0);
@@ -568,10 +628,18 @@ export default function ZoPlaysPokemonPage() {
     clearPendingInput();
     frameLoadingRef.current = true;
     setFrameLoading(true);
-    setFrameRequestId((current) => current + 1);
+    void refreshFrame(true);
   }, [room]);
 
-  const imageUrl = `/api/zoplayspokemon-frame?room=${encodeURIComponent(room)}`;
+  useEffect(() => {
+    return () => {
+      frameFetchIdRef.current += 1;
+      if (frameObjectUrlRef.current) {
+        URL.revokeObjectURL(frameObjectUrlRef.current);
+      }
+    };
+  }, []);
+
   const recentLabel = pendingTapCode ? buttonName(pendingTapCode) : "Tap-ready";
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
@@ -629,21 +697,9 @@ export default function ZoPlaysPokemonPage() {
               </div>
               <div className="relative aspect-[10/9] overflow-hidden rounded-[16px] border border-[#608080] bg-[#002020]">
                 <img
-                  key={`${room}:${frameRequestId}`}
-                  src={imageUrl}
+                  src={frameSrc}
                   alt="Shared game screen"
                   loading="eager"
-                  onLoad={() => {
-                    frameLoadingRef.current = false;
-                    setFrameLoading(false);
-                    clearPendingInput();
-                  }}
-                  onError={() => {
-                    frameLoadingRef.current = false;
-                    setFrameLoading(false);
-                    clearPendingInput();
-                    setError("Frame feed unavailable");
-                  }}
                   className="block h-full w-full bg-[#002020]"
                   style={{ imageRendering: "pixelated" }}
                 />
