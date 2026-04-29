@@ -29,6 +29,7 @@ Keep route edits and repo commits synced so the repo stays aligned with producti
 - Hosted emulator service: `https://zo-gameboy-etok.zocomputer.io`
 - Service source: `server/zo_gameboy_server.py`
 - Uses a per-room emulator loop with queued taps and held-button state
+- Presentation is intentionally delayed per button so d-pad updates stay quick while dialogue/menu inputs wait for a settled frame
 - `/rooms` exposes `acceptedInputVersion`, `presentedFrameVersion`, queue depth, held buttons, and timestamps
 - Managed entrypoint runs `python3.12 server/zo_gameboy_server.py` directly with `window="null"` and sound emulation disabled
 - Current ROM path in service entrypoint: `roms/pokemon-crystal.gbc`

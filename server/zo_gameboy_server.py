@@ -26,6 +26,26 @@ logger = logging.getLogger("zo-gameboy")
 WARMUP_FRAMES = 480
 ROOM_FPS = 30
 TAP_HOLD_FRAMES = 8
+TAP_SETTLE_FRAMES = {
+    "right": 3,
+    "left": 3,
+    "up": 3,
+    "down": 3,
+    "a": 12,
+    "b": 10,
+    "select": 10,
+    "start": 14,
+}
+HELD_SETTLE_FRAMES = {
+    "right": 2,
+    "left": 2,
+    "up": 2,
+    "down": 2,
+    "a": 4,
+    "b": 4,
+    "select": 4,
+    "start": 5,
+}
 
 parser = argparse.ArgumentParser(description="Zo shared Game Boy server")
 parser.add_argument(
@@ -98,6 +118,7 @@ def get_room(name: str) -> dict:
                 "pressed_buttons": set(),
                 "tap_frames": {},
                 "tap_queue": [],
+                "pending_presentations": [],
                 "running": False,
                 "worker": None,
                 "input_version": 0,
@@ -106,6 +127,15 @@ def get_room(name: str) -> dict:
                 "last_frame_at": 0,
             }
         return rooms[room_name]
+
+
+def presentation_delay_frames(button: str, action: str, queue_depth: int) -> int:
+    if action == "tap":
+        settle_frames = TAP_SETTLE_FRAMES.get(button, 6)
+        return max(1, queue_depth * TAP_HOLD_FRAMES + settle_frames)
+
+    settle_frames = HELD_SETTLE_FRAMES.get(button, 2)
+    return max(1, settle_frames)
 
 
 def room_loop(room: dict) -> None:
@@ -141,8 +171,16 @@ def room_loop(room: dict) -> None:
                     next_tap_frames[button] = frames_left - 1
             room["tap_frames"] = next_tap_frames
             room["latest_frame"] = render_frame(pyboy)
-            if room["frame_version"] < room["input_version"]:
-                room["frame_version"] = room["input_version"]
+            due_versions = []
+            remaining_presentations = []
+            for version, ready_tick in room["pending_presentations"]:
+                if room["ticks"] >= ready_tick:
+                    due_versions.append(version)
+                else:
+                    remaining_presentations.append((version, ready_tick))
+            room["pending_presentations"] = remaining_presentations
+            if due_versions:
+                room["frame_version"] = max(room["frame_version"], max(due_versions))
                 room["last_frame_at"] = int(time.time() * 1000)
 
         time.sleep(frame_delay)
@@ -199,11 +237,14 @@ def queue_input(room: dict, raw_button: str, raw_action: str) -> dict:
 
         room["input_version"] += 1
         room["last_input_at"] = int(time.time() * 1000)
+        queue_depth = len(room["tap_queue"])
+        ready_tick = room["ticks"] + presentation_delay_frames(button, action, queue_depth)
+        room["pending_presentations"].append((room["input_version"], ready_tick))
 
         return {
             "button": button,
             "action": action,
-            "queueDepth": len(room["tap_queue"]),
+            "queueDepth": queue_depth,
             "heldButtons": sorted(room["desired_buttons"]),
             "acceptedInputVersion": room["input_version"],
             "presentedFrameVersion": room["frame_version"],
