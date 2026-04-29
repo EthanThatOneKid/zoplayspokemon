@@ -53,7 +53,6 @@ const KEY_TO_CODE: Record<string, string> = {
   " ": "7",
 };
 
-const POINTER_HOLD_DELAY_MS = 120;
 const INPUT_TIMEOUT_MS = 6000;
 const MAX_QUEUE_DEPTH = 5;
 const LONG_POLL_TIMEOUT_MS = 20_000;
@@ -192,22 +191,17 @@ function DpadButton({
   disabled,
   label,
   onPress,
-  onRelease,
 }: {
   active: boolean;
   disabled: boolean;
   label: string;
   onPress: PointerEventHandler<HTMLButtonElement>;
-  onRelease: PointerEventHandler<HTMLButtonElement>;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onPointerDown={onPress}
-      onPointerUp={onRelease}
-      onPointerCancel={onRelease}
-      onPointerLeave={onRelease}
       onContextMenu={(event) => event.preventDefault()}
       className="relative flex h-16 w-16 items-center justify-center rounded-[10px] border border-black/30 text-[12px] text-[#f5f5da] transition disabled:cursor-wait disabled:opacity-70"
       style={{
@@ -229,13 +223,11 @@ function ActionButton({
   button,
   disabled,
   onPress,
-  onRelease,
 }: {
   active: boolean;
   button: ButtonDef;
   disabled: boolean;
   onPress: PointerEventHandler<HTMLButtonElement>;
-  onRelease: PointerEventHandler<HTMLButtonElement>;
 }) {
   const background = button.code === "4" ? "#d03030" : "#8030a0";
   const shadow = button.code === "4" ? "rgba(92, 15, 15, 0.5)" : "rgba(55, 18, 85, 0.55)";
@@ -244,9 +236,6 @@ function ActionButton({
       type="button"
       disabled={disabled}
       onPointerDown={onPress}
-      onPointerUp={onRelease}
-      onPointerCancel={onRelease}
-      onPointerLeave={onRelease}
       onContextMenu={(event) => event.preventDefault()}
       className="flex h-20 w-20 items-center justify-center rounded-full border border-black/25 text-[#fff7ef] transition disabled:cursor-wait disabled:opacity-70"
       style={{
@@ -301,22 +290,18 @@ export default function ZoPlaysPokemonPage() {
   const [error, setError] = useState("");
   const [frameRequestId, setFrameRequestId] = useState(0);
   const [frameVersion, setFrameVersion] = useState(0);
-  const [heldCodes, setHeldCodes] = useState<string[]>([]);
   const [inputVersion, setInputVersion] = useState(0);
   const [lastFrameAt, setLastFrameAt] = useState(0);
   const [room, setRoom] = useState("main");
-  const [activeCodes, setActiveCodes] = useState<string[]>([]);
   const [pendingTapCode, setPendingTapCode] = useState<string | null>(null);
   const [queueCount, setQueueCount] = useState(0);
   const [queueDepth, setQueueDepth] = useState(0);
   const [keyboardEnabled, setKeyboardEnabled] = useState(false);
   const [frameLoading, setFrameLoading] = useState(true);
   const user = useMemo(() => Math.random().toString(36).slice(2, 8), []);
-  const activeCodesRef = useRef<Set<string>>(new Set());
   const frameVersionRef = useRef(0);
   const inputVersionRef = useRef(0);
   const lastFrameAtRef = useRef(0);
-  const pointerTimersRef = useRef<Map<string, number>>(new Map());
   const pendingTimeoutRef = useRef<number | null>(null);
   const frameLoadingRef = useRef(true);
   const updatedAtRef = useRef(Date.now());
@@ -334,10 +319,6 @@ export default function ZoPlaysPokemonPage() {
   };
 
   const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
-
-  const syncActiveCodes = () => {
-    setActiveCodes(Array.from(activeCodesRef.current.values()).sort());
-  };
 
   const notePendingInput = () => {
     setQueueCount((current) => Math.min(MAX_QUEUE_DEPTH, current + 1));
@@ -442,30 +423,12 @@ export default function ZoPlaysPokemonPage() {
         setFrameVersion(nextFrameVersion);
       }
       setQueueDepth(Math.max(0, nextQueueDepth));
-      if (Array.isArray(data.heldButtons)) {
-        setHeldCodes(data.heldButtons.filter((button): button is string => typeof button === "string"));
-      }
       runBurstPoll(Math.max(nextInputVersion, inputVersionRef.current));
       return true;
     } catch {
       failInput("Network issue while sending input");
       return false;
     }
-  };
-
-  const startHold = (code: string) => {
-    if (controlsDisabled || activeCodesRef.current.has(code)) return;
-    setError("");
-    activeCodesRef.current.add(code);
-    syncActiveCodes();
-    void sendInput(code, "press");
-  };
-
-  const endHold = (code: string) => {
-    if (!activeCodesRef.current.has(code)) return;
-    activeCodesRef.current.delete(code);
-    syncActiveCodes();
-    void sendInput(code, "release");
   };
 
   const tap = (code: string) => {
@@ -476,26 +439,9 @@ export default function ZoPlaysPokemonPage() {
   };
 
   const beginPointerPress = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (controlsDisabled || pointerTimersRef.current.has(code) || activeCodesRef.current.has(code)) return;
+    if (controlsDisabled) return;
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const timer = window.setTimeout(() => {
-      pointerTimersRef.current.delete(code);
-      startHold(code);
-    }, POINTER_HOLD_DELAY_MS);
-    pointerTimersRef.current.set(code, timer);
-  };
-
-  const endPointerPress = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    const pendingTimer = pointerTimersRef.current.get(code);
-    if (pendingTimer !== undefined) {
-      window.clearTimeout(pendingTimer);
-      pointerTimersRef.current.delete(code);
-      tap(code);
-      return;
-    }
-    endHold(code);
+    tap(code);
   };
 
   const pressMenuButton = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -528,11 +474,6 @@ export default function ZoPlaysPokemonPage() {
 
     const nextQueueDepth = Number(data.queueDepth || 0);
     setQueueDepth(Number.isFinite(nextQueueDepth) ? Math.max(0, nextQueueDepth) : 0);
-
-    const nextHeldCodes = Array.isArray(data.heldButtons)
-      ? data.heldButtons.filter((button): button is string => typeof button === "string")
-      : [];
-    setHeldCodes(nextHeldCodes);
 
     const nextLastFrameAt = Number(data.lastFrameAt || 0);
     if (Number.isFinite(nextLastFrameAt) && nextLastFrameAt >= lastFrameAtRef.current) {
@@ -594,45 +535,19 @@ export default function ZoPlaysPokemonPage() {
   }, [error]);
 
   useEffect(() => {
-    const releaseAll = () => {
-      const activeNow = Array.from(activeCodesRef.current.values());
-      activeCodesRef.current.clear();
-      syncActiveCodes();
-      for (const code of activeNow) {
-        void sendInput(code, "release");
-      }
-    };
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (!keyboardEnabled) return;
       const code = KEY_TO_CODE[event.key];
       if (!code) return;
       event.preventDefault();
       if (event.repeat) return;
-      startHold(code);
-    };
-
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (!keyboardEnabled) return;
-      const code = KEY_TO_CODE[event.key];
-      if (!code) return;
-      event.preventDefault();
-      endHold(code);
+      tap(code);
     };
 
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", releaseAll);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", releaseAll);
-      releaseAll();
-      for (const timer of pointerTimersRef.current.values()) {
-        window.clearTimeout(timer);
-      }
-      pointerTimersRef.current.clear();
       if (pendingTimeoutRef.current !== null) {
         window.clearTimeout(pendingTimeoutRef.current);
       }
@@ -647,7 +562,6 @@ export default function ZoPlaysPokemonPage() {
     updatedAtRef.current = Date.now();
     setEvents([]);
     setFrameVersion(0);
-    setHeldCodes([]);
     setInputVersion(0);
     setLastFrameAt(0);
     setQueueDepth(0);
@@ -658,11 +572,7 @@ export default function ZoPlaysPokemonPage() {
   }, [room]);
 
   const imageUrl = `/api/zoplayspokemon-frame?room=${encodeURIComponent(room)}`;
-  const heldLabel = heldCodes.length
-    ? heldCodes.map(buttonName).join(", ")
-    : activeCodes.length
-      ? activeCodes.map(buttonName).join(", ")
-      : "No buttons held";
+  const recentLabel = pendingTapCode ? buttonName(pendingTapCode) : "Tap-ready";
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
 
@@ -703,7 +613,7 @@ export default function ZoPlaysPokemonPage() {
             <span className="rounded-full bg-[#c8c8a8] px-3 py-1">
               ROOM <span className="zp-font-mono ml-2 text-[10px]">{room}</span>
             </span>
-            <span className="rounded-full bg-[#d7d7ba] px-3 py-1">LIVE {heldLabel}</span>
+            <span className="rounded-full bg-[#d7d7ba] px-3 py-1">RECENT {recentLabel}</span>
             <span className="rounded-full bg-[#d7d7ba] px-3 py-1">
               FRAME {frameVersion} · {lastFrameAt ? new Date(lastFrameAt).toLocaleTimeString() : "waiting"}
             </span>
@@ -760,7 +670,7 @@ export default function ZoPlaysPokemonPage() {
               <div>
                 <h2 className="zp-font-mono text-[11px] text-[#303020]">CONTROLS</h2>
                 <p className="mt-2 text-[16px] leading-4 text-[#4a4a34]">
-                  Pointer controls lock briefly after each input so everyone can see the queue land.
+                  Every button press is treated the same way: one tap in, then a short lock so everyone sees the result land.
                 </p>
               </div>
               <button
@@ -785,34 +695,30 @@ export default function ZoPlaysPokemonPage() {
                   <div />
                   <DpadButton
                     label="UP"
-                    active={activeCodes.includes("2")}
+                    active={pendingTapCode === "2"}
                     disabled={controlsDisabled}
                     onPress={beginPointerPress("2")}
-                    onRelease={endPointerPress("2")}
                   />
                   <div />
                   <DpadButton
                     label="LEFT"
-                    active={activeCodes.includes("1")}
+                    active={pendingTapCode === "1"}
                     disabled={controlsDisabled}
                     onPress={beginPointerPress("1")}
-                    onRelease={endPointerPress("1")}
                   />
                   <div className="rounded-[10px] bg-[#b5b595]" />
                   <DpadButton
                     label="RIGHT"
-                    active={activeCodes.includes("0")}
+                    active={pendingTapCode === "0"}
                     disabled={controlsDisabled}
                     onPress={beginPointerPress("0")}
-                    onRelease={endPointerPress("0")}
                   />
                   <div />
                   <DpadButton
                     label="DOWN"
-                    active={activeCodes.includes("3")}
+                    active={pendingTapCode === "3"}
                     disabled={controlsDisabled}
                     onPress={beginPointerPress("3")}
-                    onRelease={endPointerPress("3")}
                   />
                   <div />
                 </div>
@@ -822,10 +728,9 @@ export default function ZoPlaysPokemonPage() {
                     <ActionButton
                       key={button.code}
                       button={button}
-                      active={activeCodes.includes(button.code) || pendingTapCode === button.code}
+                      active={pendingTapCode === button.code}
                       disabled={controlsDisabled}
                       onPress={beginPointerPress(button.code)}
-                      onRelease={endPointerPress(button.code)}
                     />
                   ))}
                 </div>
