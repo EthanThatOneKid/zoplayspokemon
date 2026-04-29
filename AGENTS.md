@@ -1,26 +1,26 @@
-# gameboy-share
+# zoplayspokemon
 
-Collaborative Gameboy-style input pad backed by Ethan's own hosted emulator service on Zo. Multiple visitors in the same room share one running game session.
+Collaborative shared Pokemon play room backed by Ethan's own hosted emulator service on Zo. Multiple visitors in the same room share one running game session.
 
-**Live:** https://etok.zo.space/gameboy-share
+**Live:** https://etok.zo.space/zoplayspokemon
 
 ## Mirror Status
 
-This repo mirrors the live Zo Space route set for Gameboy Share, including the page and related API endpoints.
+This repo mirrors the live Zo Space route set for Zo Plays Pokemon, including the page and related API endpoints.
 Keep route edits and repo commits synced so the repo stays aligned with production.
 
 ## Routes
 
 | Path | Type | Description |
 |------|------|-------------|
-| `/gameboy-share` | page | Interactive pad UI with live screen feed |
-| `/api/gameboy-share-state` | api | GET recent button events |
-| `/api/gameboy-share-input` | api | POST a tap, press, or release → upstream service |
-| `/api/gameboy-share-frame` | api | GET proxied PNG frame for a room |
+| `/zoplayspokemon` | page | Interactive pad UI with live screen feed |
+| `/api/zoplayspokemon-state` | api | GET recent button events |
+| `/api/zoplayspokemon-input` | api | POST a tap, press, or release → upstream service |
+| `/api/zoplayspokemon-frame` | api | GET proxied PNG frame for a room |
 
 ## State
 
-- In-memory global store keyed `__gameboy_share_state`
+- In-memory global store keyed `__zoplayspokemon_state`
 - Keeps last 80 events; resets on server restart
 
 ## Service
@@ -33,6 +33,6 @@ Keep route edits and repo commits synced so the repo stays aligned with producti
 
 ## Sync
 
-- Routes live at: https://github.com/EthanThatOneKid/gameboy-share
-- Export from zo.space → `bun export.ts --name gameboy-share`
+- Routes live at: https://github.com/EthanThatOneKid/zoplayspokemon
+- Export from zo.space → `bun export.ts --name zoplayspokemon`
 - Import to zo.space → `bun import.ts` (from repo root)

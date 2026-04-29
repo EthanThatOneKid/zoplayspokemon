@@ -1,27 +1,27 @@
-# gameboy-share
+# zoplayspokemon
 
-A collaborative Gameboy-style input pad running on Zo Space. Multiple visitors in the same room share one self-hosted game session running on Zo.
+A collaborative shared Pokemon play room on Zo Space. Multiple visitors in the same room control one self-hosted game session running on Zo.
 
-**Live:** [https://etok.zo.space/gameboy-share](https://etok.zo.space/gameboy-share)
+**Live:** [https://etok.zo.space/zoplayspokemon](https://etok.zo.space/zoplayspokemon)
 
-> **Zo Space mirror repo:** this repository mirrors the live Zo Space route family behind `https://etok.zo.space/gameboy-share` and its related API endpoints. The repo should reflect the currently deployed experience.
+> **Zo Space mirror repo:** this repository mirrors the live Zo Space route family behind `https://etok.zo.space/zoplayspokemon` and its related API endpoints. The repo should reflect the currently deployed experience.
 
 ## Routes
 
 | Path | Type | Description |
 |------|------|-------------|
-| `/gameboy-share` | page | Interactive Gameboy pad UI |
-| `/api/gameboy-share-state` | API | GET — returns recent input events + stream info |
-| `/api/gameboy-share-input` | API | POST — send a tap, press, or release |
-| `/api/gameboy-share-frame` | API | GET — returns the latest proxied PNG frame |
+| `/zoplayspokemon` | page | Shared Pokemon play UI |
+| `/api/zoplayspokemon-state` | API | GET — returns recent input events + stream info |
+| `/api/zoplayspokemon-input` | API | POST — send a tap, press, or release |
+| `/api/zoplayspokemon-frame` | API | GET — returns the latest proxied PNG frame |
 
 ## How It Works
 
 1. Visitor taps or holds a button with touch, mouse, or keyboard
-2. The page POSTs to `/api/gameboy-share-input` with `{ button, action, user }`
+2. The page POSTs to `/api/zoplayspokemon-input` with `{ button, action, user }`
 3. The API forwards the input to Ethan's hosted emulator service on Zo
 4. The emulator service runs a steady per-room loop, queues taps, and keeps held buttons active until release
-5. The page loads frames from `/api/gameboy-share-frame?room=<name>` and polls `/api/gameboy-share-state`
+5. The page loads frames from `/api/zoplayspokemon-frame?room=<name>` and polls `/api/zoplayspokemon-state`
 
 ## Service
 
@@ -33,21 +33,21 @@ A collaborative Gameboy-style input pad running on Zo Space. Multiple visitors i
 
 ## API Reference
 
-### `GET /api/gameboy-share-state`
+### `GET /api/zoplayspokemon-state`
 
 Returns current game state and recent input log.
 
 ```json
 {
   "room": "main",
-  "streamUrl": "/api/gameboy-share-frame?room=main",
+  "streamUrl": "/api/zoplayspokemon-frame?room=main",
   "controls": { "up": "2", "down": "3", ... },
   "updatedAt": 1715000000000,
   "events": [{ "button": "4", "user": "a3f2b1", "timestamp": 1715000000000 }]
 }
 ```
 
-### `POST /api/gameboy-share-input`
+### `POST /api/zoplayspokemon-input`
 
 ```json
 { "room": "main", "button": "4", "action": "press", "user": "a3f2b1" }
