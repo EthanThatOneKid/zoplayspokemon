@@ -22,12 +22,14 @@ Keep route edits and repo commits synced so the repo stays aligned with producti
 
 - In-memory global store keyed `__zoplayspokemon_state`
 - Keeps last 80 events; resets on server restart
+- State route now long-polls and mirrors backend `inputVersion` / `frameVersion` metadata
 
 ## Service
 
 - Hosted emulator service: `https://zo-gameboy-etok.zocomputer.io`
 - Service source: `server/zo_gameboy_server.py`
 - Uses a per-room emulator loop with queued taps and held-button state
+- `/rooms` exposes `acceptedInputVersion`, `presentedFrameVersion`, queue depth, held buttons, and timestamps
 - Managed entrypoint runs `python3.12 server/zo_gameboy_server.py` directly with `window="null"` and sound emulation disabled
 - Current ROM path in service entrypoint: `roms/pokemon-crystal.gbc`
 

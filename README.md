@@ -11,7 +11,7 @@ A collaborative shared Pokemon play room on Zo Space. Multiple visitors in the s
 | Path | Type | Description |
 |------|------|-------------|
 | `/zoplayspokemon` | page | Shared Pokemon play UI |
-| `/api/zoplayspokemon-state` | API | GET — returns recent input events + stream info |
+| `/api/zoplayspokemon-state` | API | GET — returns recent input events + long-poll frame/input metadata |
 | `/api/zoplayspokemon-input` | API | POST — send a tap, press, or release |
 | `/api/zoplayspokemon-frame` | API | GET — returns the latest proxied PNG frame |
 
@@ -21,7 +21,8 @@ A collaborative shared Pokemon play room on Zo Space. Multiple visitors in the s
 2. The page POSTs to `/api/zoplayspokemon-input` with `{ button, action, user }`
 3. The API forwards the input to Ethan's hosted emulator service on Zo
 4. The emulator service runs a steady per-room loop, queues taps, and keeps held buttons active until release
-5. The page loads frames from `/api/zoplayspokemon-frame?room=<name>` and polls `/api/zoplayspokemon-state`
+5. The state route long-polls until new input or a newer rendered frame is available
+6. The page refreshes the PNG frame only when input is accepted, when the backend reports a newer frame, or when a slow fallback timer fires
 
 ## Service
 
@@ -43,6 +44,10 @@ Returns current game state and recent input log.
   "streamUrl": "/api/zoplayspokemon-frame?room=main",
   "controls": { "up": "2", "down": "3", ... },
   "updatedAt": 1715000000000,
+  "inputVersion": 12,
+  "frameVersion": 12,
+  "queueDepth": 0,
+  "heldButtons": [],
   "events": [{ "button": "4", "user": "a3f2b1", "timestamp": 1715000000000 }]
 }
 ```
