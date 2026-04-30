@@ -1,10 +1,10 @@
 # zoplayspokemon
 
-An educational mirror repo for a collaborative emulator-control experiment on Zo Space. The focus is the input pipeline, frame-sync behavior, and hosted emulator UX rather than distributing a branded game experience.
+An educational mirror repo for a collaborative Pokemon emulator-control experiment on Zo Space. This repository exists to document what was built, what it proves technically, and where the legal and product boundaries are. It is not a tutorial, starter kit, or recommendation to recreate the same public experience.
 
-> **Status:** public framing is being narrowed toward an educational systems demo. See issue #1 for the current repositioning work.
+> **Status:** this repo intentionally keeps Pokemon explicit because the real project, and the tension around it, are part of the case study. The goal is transparent documentation, not sanitized rebranding.
 >
-> **Zo Space mirror repo:** this repository mirrors the live Zo Space route family behind `https://etok.zo.space/zoplayspokemon` and its related API endpoints. The repo should reflect the currently deployed experience, while public documentation should avoid presenting the project as a redistributable commercial-game experience.
+> **Zo Space mirror repo:** this repository mirrors the live Zo Space route family behind `https://etok.zo.space/zoplayspokemon` and its related API endpoints. It should describe the deployed system honestly while making clear that readers should not treat it as permission, legal clearance, or step-by-step operational guidance.
 
 ## Routes
 
@@ -25,7 +25,9 @@ This repository documents a technical experiment in:
 - latency management for emulator-backed UIs
 - hosted game-loop orchestration on Zo
 
-For public-facing demos and documentation, prefer original, public-domain, or otherwise redistributable content. Avoid framing the project as a way to publicly play or redistribute copyrighted commercial games.
+It also documents a real Pokemon-specific implementation on purpose. That specificity matters to the case study. Hiding it would make the record less honest.
+
+At the same time, this repo should not be read as a how-to for launching another Pokemon stream, another public ROM-backed play surface, or another copyrighted-game deployment. Repeating the process may create legal risk. This repo is evidence of feasibility and a place to discuss tradeoffs, not a green light to copy it.
 
 ## How It Works
 
@@ -40,10 +42,9 @@ For public-facing demos and documentation, prefer original, public-domain, or ot
 
 - Hosted emulator service: `https://zo-gameboy-etok.zocomputer.io`
 - Service source: `server/zo_gameboy_server.py`
-- `roms/PlantBoy.gb` is the preferred safer demo ROM for public-facing documentation
-- The current hosted entrypoint may still be pointed at other local ROMs during private experimentation; public docs should not rely on or promote copyrighted commercial game content
 - Rooms are addressed with `?room=main` or any short room name
-- To swap ROMs, point the hosted service entrypoint at the desired file in `roms/`
+
+The repo may reference or discuss ROM choices as part of documenting what exists, but it should not coach readers through reproducing the setup with copyrighted game content.
 
 ## API Reference
 
@@ -96,4 +97,4 @@ Sync with the `zopack` skill in `code/workspace-root/Skills/zopack/`.
 
 ## Tracking
 
-- Repositioning issue: `#1` — pivot public framing away from a Pokemon-specific playable experience
+- Positioning issue: `#1` — keep the project documented as a Pokemon case study while making its educational, non-instructional boundaries explicit
