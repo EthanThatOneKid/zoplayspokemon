@@ -5,7 +5,19 @@ version: 0.1.0
 
 ## Colors
 
-### Plastic Shell (Nintendo Game Boy Color — Pokemon Center edition)
+This product uses one shared token system with multiple retail-inspired presets. Keep one `DESIGN.md` and treat each shell as a token override, not as a separate design document.
+
+### Retail Themes
+
+- `Atomic Purple` — translucent lavender baseline
+- `Teal` — cool blue-green shell
+- `Berry` — saturated raspberry shell
+- `Kiwi` — bright translucent green shell
+- `Dandelion` — warm yellow shell
+- `Grape` — darker violet shell
+- `Clear` — neutral translucent shell
+
+### Plastic Shell
 | Token | Hex | RGB | Use |
 |-------|-----|-----|-----|
 | `shell-primary` | `#E0E0C0` | 224,224,192 | Body, bezel, main surface |
@@ -118,6 +130,19 @@ Uses 4px base grid. Components align to multiples of 4.
 - On: `button-a` red tint, "KEYBOARD: ON"
 - Tooltip on hover explaining keyboard is available
 
+### Theme Picker
+- Opens as a dialog from the header
+- Shows retail shell presets with small swatches
+- First visit picks a random preset, then persists via local storage
+- Includes a randomize action for fast rotation
+
+### Floating Controller
+- Controller is a movable overlay, not a fixed in-flow section
+- Default anchor: bottom-center on small screens, lower-right on larger screens
+- Dragging happens from a dedicated handle so game buttons do not move the panel
+- Can minimize into a compact chip to get out of the way
+- Position and minimized state persist via local storage
+
 ## Interaction Rules
 
 1. **Button press** → loading spinner appears immediately (optimistic)
@@ -127,9 +152,12 @@ Uses 4px base grid. Components align to multiples of 4.
 5. **Keyboard controls** → opt-in only, toggle in corner
 6. **Held buttons** → held for 400ms before repeat triggers
 7. **Queue depth** → max 5 pending inputs, excess rejected with error toast
+8. **Theme selection** → first load is random, later loads reuse the saved retail preset
+9. **Controller placement** → drag position clamps to the visible viewport and survives reloads
+10. **Controller minimize** → collapsing the overlay should leave a small visible reopen affordance
 
 ## Background
 
-- Solid `shell-secondary` or subtle noise texture
-- No gradients — flat Game Boy plastic aesthetic
+- Subtle backdrop gradient is allowed behind the shell
+- Shell surfaces should still read like Game Boy plastic, not glossy glass UI
 - Page content centered in max-width 600px container
