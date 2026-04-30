@@ -106,6 +106,56 @@ function applyRoomInfo(state: ShareState, info: RoomInfo | undefined): boolean {
   return true;
 }
 
+function isColdRoomInfo(info: RoomInfo | undefined): boolean {
+  if (!info) return true;
+  return (
+    !info.frameHash &&
+    readNumber(info.acceptedInputVersion, 0) === 0 &&
+    readNumber(info.presentedFrameVersion, 0) === 0 &&
+    readNumber(info.lastInputAt, 0) === 0 &&
+    readNumber(info.lastFrameAt, 0) === 0
+  );
+}
+
+function applyFrameHeaders(state: ShareState, headers: Headers): boolean {
+  const nextFrameHash = headers.get("x-hash") || headers.get("etag")?.replace(/"/g, "") || state.frameHash;
+  const nextInputVersion = readNumber(Number(headers.get("x-input-version") || state.inputVersion), state.inputVersion);
+  const nextFrameVersion = readNumber(Number(headers.get("x-frame-version") || state.frameVersion), state.frameVersion);
+  const nextQueueDepth = readNumber(Number(headers.get("x-queue-depth") || state.queueDepth), state.queueDepth);
+  const nextLastFrameAt = Date.now();
+
+  const changed =
+    nextFrameHash !== state.frameHash ||
+    nextInputVersion !== state.inputVersion ||
+    nextFrameVersion !== state.frameVersion ||
+    nextQueueDepth !== state.queueDepth ||
+    nextLastFrameAt !== state.lastFrameAt;
+
+  if (!changed) return false;
+
+  state.frameHash = nextFrameHash;
+  state.inputVersion = nextInputVersion;
+  state.frameVersion = nextFrameVersion;
+  state.queueDepth = nextQueueDepth;
+  state.lastFrameAt = nextLastFrameAt;
+  state.updatedAt = Math.max(state.updatedAt, nextLastFrameAt, Date.now());
+  return true;
+}
+
+async function syncFromFrame(room: string, state: ShareState): Promise<boolean> {
+  try {
+    const upstream = await fetch(`${SERVICE_URL}/image?room=${encodeURIComponent(room)}`, {
+      headers: { Accept: "image/png" },
+    });
+    if (!upstream.ok) return false;
+    const changed = applyFrameHeaders(state, upstream.headers);
+    await upstream.body?.cancel().catch(() => {});
+    return changed;
+  } catch {
+    return false;
+  }
+}
+
 async function syncFromService(room: string, state: ShareState): Promise<boolean> {
   try {
     const upstream = await fetch(`${SERVICE_URL}/rooms`, {
@@ -114,7 +164,11 @@ async function syncFromService(room: string, state: ShareState): Promise<boolean
     if (!upstream.ok) return false;
     const data = (await upstream.json().catch(() => null)) as Record<string, RoomInfo> | null;
     if (!data) return false;
-    return applyRoomInfo(state, data[room]);
+    const roomInfo = data[room];
+    const roomChanged = applyRoomInfo(state, roomInfo);
+    if (roomChanged) return true;
+    if (!isColdRoomInfo(roomInfo)) return false;
+    return syncFromFrame(room, state);
   } catch {
     return false;
   }
