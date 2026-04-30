@@ -45,7 +45,7 @@ The documented system works like this:
 - Service source: `server/zo_gameboy_server.py`
 - The live system supports room-scoped sessions; this repo discusses that behavior as part of the case study, not as a deployment recommendation.
 
-The repo may reference or discuss ROM choices as part of documenting what exists, but it should not coach readers through reproducing the setup with copyrighted game content.
+The repository includes `roms/PlantBoy.gb` (a free homebrew Game Boy title) for reference. Live deployments use Pokémon ROMs (e.g., `pokemon-crystal.gbc`), which are not included in this repository (see `.gitignore`) due to copyright. The repo may reference or discuss ROM choices as part of documenting what exists, but it should not coach readers through reproducing the setup with copyrighted game content.
 
 ## API Reference
 

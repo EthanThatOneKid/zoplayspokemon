@@ -36,6 +36,7 @@ The live route already includes the retail theme presets, floating controller UI
 - Presentation is intentionally delayed per button so d-pad updates stay quick while dialogue/menu inputs wait for a settled frame
 - `/rooms` exposes `acceptedInputVersion`, `presentedFrameVersion`, queue depth, held buttons, and timestamps
 - Managed entrypoint runs `python3.12 server/zo_gameboy_server.py` directly with `window="null"` and sound emulation disabled
+- The repository includes `roms/PlantBoy.gb` (free homebrew) for reference; live instances use Pokémon ROMs (not included, gitignored).
 - Public docs may discuss the Pokemon-specific setup, but should not coach readers through repeating it with copyrighted ROMs
 
 ## Sync
