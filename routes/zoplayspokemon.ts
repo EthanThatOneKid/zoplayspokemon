@@ -120,6 +120,10 @@ const CONTROLLER_POSITION_STORAGE_KEY = "zoplayspokemon.controllerPosition";
 const CONTROLLER_MINIMIZED_STORAGE_KEY = "zoplayspokemon.controllerMinimized";
 const REPO_URL = "https://github.com/EthanThatOneKid/zoplayspokemon";
 
+function roomPlayerNameStorageKey(room: string): string {
+  return `zoplayspokemon.playerName.${room}`;
+}
+
 const THEME_PRESETS: ThemePreset[] = [
   {
     id: "atomic-purple",
@@ -735,7 +739,8 @@ export default function ZoPlaysPokemonPage() {
   const [controllerMinimized, setControllerMinimized] = useState(false);
   const [controllerPosition, setControllerPosition] = useState<Position | null>(null);
   const [panelTab, setPanelTab] = useState<ControlPanelTab>("play");
-  const user = useMemo(() => Math.random().toString(36).slice(2, 8), []);
+  const [playerName, setPlayerName] = useState("guest");
+  const [draggingController, setDraggingController] = useState(false);
   const frameHashRef = useRef("");
   const frameVersionRef = useRef(0);
   const inputVersionRef = useRef(0);
@@ -768,12 +773,6 @@ export default function ZoPlaysPokemonPage() {
     const basePosition = nextPosition || getDefaultControllerPosition(minimized);
     const { width, height } = measureController(minimized);
     return clampControllerPosition(basePosition, width, height);
-  };
-
-  const openControllerPanel = (nextTab: ControlPanelTab) => {
-    setControllerMinimized(false);
-    setPanelTab(nextTab);
-    setControllerPosition((current) => normalizeControllerPosition(current, false));
   };
 
   const refreshFrame = async (force = false) => {
@@ -925,7 +924,7 @@ export default function ZoPlaysPokemonPage() {
       const res = await fetch("/api/zoplayspokemon-input", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ room, button: code, action, user }),
+        body: JSON.stringify({ room, button: code, action, user: playerName.trim() || "guest" }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -979,6 +978,7 @@ export default function ZoPlaysPokemonPage() {
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
     };
+    setDraggingController(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
     event.preventDefault();
   };
@@ -1102,6 +1102,16 @@ export default function ZoPlaysPokemonPage() {
   }, [themeId, themeReady]);
 
   useEffect(() => {
+    const storedName = window.localStorage.getItem(roomPlayerNameStorageKey(room));
+    setPlayerName((storedName || "guest").slice(0, 24));
+  }, [room]);
+
+  useEffect(() => {
+    if (!playerName) return;
+    window.localStorage.setItem(roomPlayerNameStorageKey(room), playerName);
+  }, [playerName, room]);
+
+  useEffect(() => {
     if (!themeReady) return;
     window.localStorage.setItem(CONTROLLER_MINIMIZED_STORAGE_KEY, controllerMinimized ? "true" : "false");
     const timer = window.setTimeout(() => {
@@ -1142,6 +1152,7 @@ export default function ZoPlaysPokemonPage() {
     const onPointerEnd = (event: PointerEvent) => {
       if (dragStateRef.current?.pointerId !== event.pointerId) return;
       dragStateRef.current = null;
+      setDraggingController(false);
     };
 
     window.addEventListener("pointermove", onPointerMove);
@@ -1216,6 +1227,7 @@ export default function ZoPlaysPokemonPage() {
   }, []);
 
   const recentLabel = pendingTapCode ? buttonName(pendingTapCode) : "Tap-ready";
+  const isDraggingController = draggingController;
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
   const showFrameLoadingOverlay = frameLoading && (!frameSrc || visibleQueueCount > 0);
@@ -1228,8 +1240,7 @@ export default function ZoPlaysPokemonPage() {
           className="mb-4 rounded-[22px] border border-black/10 px-4 py-4 shadow-[0_14px_30px_rgba(0,0,0,0.16)]"
           style={{ background: "var(--shell-primary)" }}
         >
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div>
               <p className="zp-font-mono text-[10px]" style={{ color: "var(--text-muted)" }}>
                 ZO COMMUNITY EXPERIMENT
               </p>
@@ -1239,41 +1250,6 @@ export default function ZoPlaysPokemonPage() {
               <p className="mt-3 text-[18px] leading-5" style={{ color: "var(--text-soft)" }}>
                 Everyone in this room shares one self-hosted Pokemon session on your Zo.
               </p>
-            </div>
-            <div className="flex flex-col items-stretch gap-2">
-              <button
-                type="button"
-                onClick={() => openControllerPanel("settings")}
-                className="rounded-full px-3 py-2 text-left transition"
-                style={{
-                  background: "var(--chip)",
-                  boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.16)",
-                }}
-              >
-                <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                  DECK MENU
-                </div>
-                <div className="mt-1 text-[14px] leading-4" style={{ color: "var(--text-strong)" }}>
-                  Settings + About
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => openControllerPanel("about")}
-                className="min-w-[118px] rounded-full px-3 py-2 text-left transition"
-                style={{
-                  background: "var(--chip-soft)",
-                  boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
-                }}
-              >
-                <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                  HOW THIS WORKS
-                </div>
-                <div className="mt-1 text-[14px] leading-4" style={{ color: "var(--text-muted)" }}>
-                  Rooms, repo, and features.
-                </div>
-              </button>
-            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-[14px] leading-4" style={{ color: "var(--text-soft)" }}>
@@ -1338,7 +1314,7 @@ export default function ZoPlaysPokemonPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="zp-font-mono text-[11px]" style={{ color: "var(--text-strong)" }}>
-                  CONTROL DECK
+                  CONTROLLER
                 </h2>
                 <p className="mt-2 text-[16px] leading-4" style={{ color: "var(--text-soft)" }}>
                   The controller now floats above the page. Drag it where you want, minimize it when it gets in the way, and keep a retail shell you like.
@@ -1377,12 +1353,31 @@ export default function ZoPlaysPokemonPage() {
             className="mt-5 rounded-[24px] border border-black/10 px-4 py-4"
             style={{ background: "var(--shell-primary)" }}
           >
-            <h2 className="zp-font-mono text-[11px]" style={{ color: "var(--text-strong)" }}>
-              LIVE ACTIVITY
-            </h2>
             <p className="mt-2 text-[15px] leading-4" style={{ color: "var(--text-soft)" }}>
               Last state update: {new Date(updatedAt).toLocaleTimeString()} · input {inputVersion}
             </p>
+            <div className="mt-4 rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <label className="block">
+                <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                  YOUR NAME IN ROOM {room.toUpperCase()}
+                </span>
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(event) => setPlayerName(event.target.value.slice(0, 24))}
+                  placeholder="guest"
+                  className="mt-3 w-full rounded-[14px] border px-3 py-3 text-[17px] outline-none"
+                  style={{
+                    borderColor: "rgba(0,0,0,0.1)",
+                    background: "rgba(255,255,255,0.6)",
+                    color: "var(--text-strong)",
+                  }}
+                />
+              </label>
+              <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
+                Saved in this browser for this room only.
+              </p>
+            </div>
             <div className="mt-4 max-h-64 space-y-2 overflow-auto">
               {events.length === 0 ? (
                 <p className="text-[18px]" style={{ color: "var(--text-muted)" }}>
@@ -1430,7 +1425,12 @@ export default function ZoPlaysPokemonPage() {
                   type="button"
                   onPointerDown={beginControllerDrag}
                   className="rounded-full px-3 py-2 transition"
-                  style={{ touchAction: "none", background: "var(--chip)", color: "var(--text-strong)" }}
+                  style={{
+                    touchAction: "none",
+                    cursor: isDraggingController ? "grabbing" : "grab",
+                    background: "var(--chip)",
+                    color: "var(--text-strong)",
+                  }}
                 >
                   <span className="zp-font-mono text-[9px]">MOVE</span>
                 </button>
@@ -1462,13 +1462,18 @@ export default function ZoPlaysPokemonPage() {
                       type="button"
                       onPointerDown={beginControllerDrag}
                       className="rounded-full px-3 py-2 transition"
-                      style={{ touchAction: "none", background: "var(--chip)", color: "var(--text-strong)" }}
+                      style={{
+                        touchAction: "none",
+                        cursor: isDraggingController ? "grabbing" : "grab",
+                        background: "var(--chip)",
+                        color: "var(--text-strong)",
+                      }}
                     >
                       <span className="zp-font-mono text-[9px]">MOVE</span>
                     </button>
                     <div>
                       <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                        FLOATING CONTROL DECK
+                        CONTROLLER
                       </div>
                       <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
                         {panelTab === "play"
