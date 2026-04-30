@@ -1242,13 +1242,13 @@ export default function ZoPlaysPokemonPage() {
         >
           <div>
               <p className="zp-font-mono text-[10px]" style={{ color: "var(--text-muted)" }}>
-                ZO COMMUNITY EXPERIMENT
+                DOCUMENTED LIVE CASE STUDY
               </p>
               <h1 className="zp-font-mono mt-3 text-lg leading-6" style={{ color: "var(--text-strong)" }}>
                 #ZOPLAYSPOKEMON
               </h1>
               <p className="mt-3 text-[18px] leading-5" style={{ color: "var(--text-soft)" }}>
-                Everyone in this room shares one self-hosted Pokemon session on your Zo.
+                This page documents a live, shared Pokemon emulator experiment running on Zo infrastructure.
               </p>
           </div>
 
@@ -1272,8 +1272,8 @@ export default function ZoPlaysPokemonPage() {
           <div className="zp-frame-glow rounded-[26px] border border-black/20 p-3" style={{ background: "var(--panel)" }}>
             <div className="rounded-[22px] border px-3 pb-4 pt-3" style={{ borderColor: "var(--shell-dark)", background: "var(--bezel-dark)" }}>
               <div className="mb-2 flex items-center justify-between gap-2 text-[11px]" style={{ color: "var(--shell-accent)" }}>
-                <span className="zp-font-mono">LIVE GAME FEED</span>
-                <span className="zp-font-mono">{visibleQueueCount > 0 ? "SYNCING INPUT" : "LIVE FEED"}</span>
+                <span className="zp-font-mono">LIVE CASE-STUDY FEED</span>
+                <span className="zp-font-mono">{visibleQueueCount > 0 ? "SYNCING OBSERVED INPUT" : "LIVE DOCUMENTATION"}</span>
               </div>
               <div
                 className="relative aspect-[10/9] overflow-hidden rounded-[16px] border"
@@ -1293,7 +1293,11 @@ export default function ZoPlaysPokemonPage() {
                 ) : null}
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 text-[13px] leading-4" style={{ color: "var(--shell-accent)" }}>
-                <span>{visibleQueueCount > 0 ? "Input noticed. Waiting for the next frame." : "Press a button to nudge the shared game."}</span>
+                <span>
+                  {visibleQueueCount > 0
+                    ? "Input observed. Waiting for the next documented frame."
+                    : "This surface demonstrates shared remote input behavior on a live Pokemon session."}
+                </span>
                 {visibleQueueCount > 0 ? (
                   <span
                     className="flex items-center gap-2 rounded-full border px-3 py-1"
@@ -1546,7 +1550,7 @@ export default function ZoPlaysPokemonPage() {
                             : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.18)",
                         }}
                       >
-                        <span className="zp-font-mono text-[10px]">QUICK START</span>
+                        <span className="zp-font-mono text-[10px]">SEND START INPUT</span>
                       </button>
                     </div>
 
@@ -1751,7 +1755,7 @@ export default function ZoPlaysPokemonPage() {
                         ABOUT THIS ROOM
                       </div>
                       <p className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
-                        Every room runs one shared Pokemon Crystal session. Anyone visiting the same `?room=` value joins that exact game state.
+                        This route records a real shared Pokemon Crystal session and exposes the coordination model, frame timing, and interface behavior as a public case study.
                       </p>
                     </div>
 
@@ -1761,7 +1765,7 @@ export default function ZoPlaysPokemonPage() {
                           ROOM MODEL
                         </div>
                         <p className="mt-2" style={{ color: "var(--text-strong)" }}>
-                          `main` is the default lobby. Any short room name creates a separate shared play space with its own emulator loop.
+                          The room model exists to document how isolated shared sessions were handled in the live system. Public copy should describe that architecture without treating it as a replication guide.
                         </p>
                       </div>
                       <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
@@ -1804,7 +1808,7 @@ export default function ZoPlaysPokemonPage() {
                         <span className="zp-font-mono text-[9px]">OPEN GITHUB REPO</span>
                       </a>
                       <p className="mt-3" style={{ color: "var(--text-muted)" }}>
-                        Mirror repo for the live Zo Space routes and the emulator service source.
+                        Mirror repo for the live Zo Space routes and emulator service source, kept as evidence and analysis rather than a starter kit.
                       </p>
                     </div>
                   </div>

@@ -10,7 +10,7 @@ An educational mirror repo for a collaborative Pokemon emulator-control experime
 
 | Path | Type | Description |
 |------|------|-------------|
-| `/zoplayspokemon` | page | Shared Pokemon play UI |
+| `/zoplayspokemon` | page | Public case-study surface for the shared Pokemon interface |
 | `/api/zoplayspokemon-state` | API | GET — returns recent input events + long-poll frame/input metadata |
 | `/api/zoplayspokemon-input` | API | POST — send a tap, press, or release |
 | `/api/zoplayspokemon-frame` | API | GET — returns the latest proxied PNG frame |
@@ -29,20 +29,21 @@ It also documents a real Pokemon-specific implementation on purpose. That specif
 
 At the same time, this repo should not be read as a how-to for launching another Pokemon stream, another public ROM-backed play surface, or another copyrighted-game deployment. Repeating the process may create legal risk. This repo is evidence of feasibility and a place to discuss tradeoffs, not a green light to copy it.
 
-## How It Works
+## System Behavior
 
-1. Visitor taps or holds a button with touch, mouse, or keyboard
-2. The page POSTs to `/api/zoplayspokemon-input` with `{ button, action, user }`
-3. The API forwards the input to Ethan's hosted emulator service on Zo
-4. The emulator service runs a steady per-room loop, queues taps, and keeps held buttons active until release
-5. The state route long-polls until new input or a newer rendered frame is available
-6. The page refreshes the PNG frame only when input is accepted, when the backend reports a newer frame, or when a slow fallback timer fires
+The documented system works like this:
+
+- the page captures button activity from touch, mouse, or keyboard input
+- `/api/zoplayspokemon-input` forwards that activity to Ethan's hosted emulator service on Zo
+- the emulator service runs a per-room loop, queues taps, and maintains held-button state
+- `/api/zoplayspokemon-state` long-polls for fresher input and frame metadata
+- the page refreshes the PNG feed only when the backend reports a newer accepted input or frame
 
 ## Service
 
 - Hosted emulator service: `https://zo-gameboy-etok.zocomputer.io`
 - Service source: `server/zo_gameboy_server.py`
-- Rooms are addressed with `?room=main` or any short room name
+- The live system supports room-scoped sessions; this repo discusses that behavior as part of the case study, not as a deployment recommendation.
 
 The repo may reference or discuss ROM choices as part of documenting what exists, but it should not coach readers through reproducing the setup with copyrighted game content.
 
@@ -72,7 +73,7 @@ Returns current game state and recent input log.
 { "room": "main", "button": "4", "action": "press", "user": "a3f2b1" }
 ```
 
-- `room`: string — shared room name
+- `room`: string — room identifier used by the documented live system
 - `button`: string — one of `"0"`–`"7"` (RIGHT, LEFT, UP, DOWN, A, B, SELECT, START)
 - `action`: string — `"tap"`, `"press"`, or `"release"`
 - `user`: string — anonymous visitor ID
