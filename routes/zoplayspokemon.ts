@@ -734,6 +734,7 @@ export default function ZoPlaysPokemonPage() {
   const [queueDepth, setQueueDepth] = useState(0);
   const [keyboardEnabled, setKeyboardEnabled] = useState(false);
   const [frameLoading, setFrameLoading] = useState(true);
+  const [hasFrame, setHasFrame] = useState(false);
   const [themeId, setThemeId] = useState(THEME_PRESETS[0].id);
   const [themeReady, setThemeReady] = useState(false);
   const [controllerMinimized, setControllerMinimized] = useState(false);
@@ -753,6 +754,7 @@ export default function ZoPlaysPokemonPage() {
   const frameEtagRef = useRef<string | null>(null);
   const frameObjectUrlRef = useRef<string | null>(null);
   const frameFetchIdRef = useRef(0);
+  const hasFrameRef = useRef(false);
   const controllerRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
 
@@ -777,6 +779,7 @@ export default function ZoPlaysPokemonPage() {
 
   const refreshFrame = async (force = false) => {
     if (frameLoadingRef.current && !force) return;
+    if (!hasFrameRef.current && !force && frameVersionRef.current === 0) return;
     frameLoadingRef.current = true;
     setFrameLoading(true);
 
@@ -826,16 +829,19 @@ export default function ZoPlaysPokemonPage() {
         URL.revokeObjectURL(previousUrl);
       }
 
-      frameLoadingRef.current = false;
-      setFrameLoading(false);
-      clearPendingInput();
-    } catch {
-      if (frameFetchIdRef.current !== requestId) return;
-      frameLoadingRef.current = false;
-      setFrameLoading(false);
-      clearPendingInput();
-      setError("Frame feed unavailable");
-    }
+       frameLoadingRef.current = false;
+       setFrameLoading(false);
+       hasFrameRef.current = true;
+       setHasFrame(true);
+       clearPendingInput();
+     } catch {
+       if (frameFetchIdRef.current !== requestId) return;
+       frameLoadingRef.current = false;
+       setFrameLoading(false);
+       clearPendingInput();
+       if (!hasFrameRef.current) return;
+       setError("Frame feed unavailable");
+     }
   };
 
   const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -1014,6 +1020,8 @@ export default function ZoPlaysPokemonPage() {
     }
 
     if (shouldRefreshForFrame) {
+      hasFrameRef.current = true;
+      setHasFrame(true);
       refreshFrame();
     }
   };
@@ -1200,6 +1208,8 @@ export default function ZoPlaysPokemonPage() {
     frameEtagRef.current = null;
     frameFetchIdRef.current += 1;
     updatedAtRef.current = Date.now();
+    hasFrameRef.current = false;
+    setHasFrame(false);
     setEvents([]);
     if (frameObjectUrlRef.current) {
       URL.revokeObjectURL(frameObjectUrlRef.current);

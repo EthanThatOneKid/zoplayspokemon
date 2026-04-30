@@ -44,7 +44,7 @@ At the same time, this repo should not be read as a how-to for launching another
 - Service source: `server/zo_gameboy_server.py`
 - Rooms are addressed with `?room=main` or any short room name
 
-The repo may reference or discuss ROM choices as part of documenting what exists, but it should not coach readers through reproducing the setup with copyrighted game content.
+The repository includes `roms/PlantBoy.gb` (a free homebrew Game Boy title) for reference. Live deployments use Pokémon ROMs (e.g., `pokemon-crystal.gbc`), which are not included in this repository (see `.gitignore`) due to copyright. The repo may reference or discuss ROM choices as part of documenting what exists, but it should not coach readers through reproducing the setup with copyrighted game content.
 
 ## API Reference
 
