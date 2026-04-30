@@ -3,13 +3,17 @@
 Self-hosted shared Game Boy service for Zo.
 Streams PNG frames and accepts queued button input for shared rooms.
 """
-
 import argparse
+import hashlib
 import io
 import json
 import logging
+import os
+import sys
 import threading
 import time
+import traceback
+import uuid
 import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,32 +31,16 @@ WARMUP_FRAMES = 480
 ROOM_FPS = 30
 TAP_HOLD_FRAMES = 8
 TAP_SETTLE_FRAMES = {
-    "right": 3,
-    "left": 3,
-    "up": 3,
-    "down": 3,
-    "a": 12,
-    "b": 10,
-    "select": 10,
-    "start": 14,
+    "right": 3, "left": 3, "up": 3, "down": 3,
+    "a": 12, "b": 10, "select": 10, "start": 14,
 }
 HELD_SETTLE_FRAMES = {
-    "right": 2,
-    "left": 2,
-    "up": 2,
-    "down": 2,
-    "a": 4,
-    "b": 4,
-    "select": 4,
-    "start": 5,
+    "right": 2, "left": 2, "up": 2, "down": 2,
+    "a": 4, "b": 4, "select": 4, "start": 5,
 }
 
 parser = argparse.ArgumentParser(description="Zo shared Game Boy server")
-parser.add_argument(
-    "--rom",
-    default="/usr/local/lib/python3.12/site-packages/pyboy/default_rom.gb",
-    help="Path to Game Boy ROM (.gb)",
-)
+parser.add_argument("--rom", default="/usr/local/lib/python3.12/site-packages/pyboy/default_rom.gb")
 parser.add_argument("--port", type=int, default=1991)
 parser.add_argument("--host", default="127.0.0.1")
 parser.add_argument("--tick-rate", type=int, default=0, help="0 disables speed limiting")
@@ -61,24 +49,11 @@ args = parser.parse_args()
 if not Path(args.rom).exists():
     raise SystemExit(f"ROM not found: {args.rom}")
 
-
 BUTTON_MAP = {
-    "0": "right",
-    "1": "left",
-    "2": "up",
-    "3": "down",
-    "4": "a",
-    "5": "b",
-    "6": "select",
-    "7": "start",
-    "right": "right",
-    "left": "left",
-    "up": "up",
-    "down": "down",
-    "a": "a",
-    "b": "b",
-    "select": "select",
-    "start": "start",
+    "0": "right", "1": "left", "2": "up", "3": "down",
+    "4": "a", "5": "b", "6": "select", "7": "start",
+    "right": "right", "left": "left", "up": "up", "down": "down",
+    "a": "a", "b": "b", "select": "select", "start": "start",
 }
 ACTION_MAP = {"tap", "press", "release"}
 
@@ -94,14 +69,18 @@ def render_frame(pyboy: PyBoy) -> bytes:
             image = image.convert("RGB")
     except Exception:
         array = screen.ndarray
-        image = Image.fromarray(array if array.ndim == 3 else array, mode="RGB" if array.ndim == 3 else "L")
+        image = Image.fromarray(array if array.ndim == 3 else array,
+                                mode="RGB" if array.ndim == 3 else "L")
         if image.mode != "RGB":
             image = image.convert("RGB")
-
     image = image.resize((480, 432), Image.NEAREST)
     buf = io.BytesIO()
     image.save(buf, format="PNG", optimize=False)
     return buf.getvalue()
+
+
+def frame_hash(frame_bytes: bytes) -> str:
+    return hashlib.sha256(frame_bytes).hexdigest()[:16]
 
 
 def get_room(name: str) -> dict:
@@ -114,6 +93,7 @@ def get_room(name: str) -> dict:
                 "ticks": 0,
                 "lock": threading.Lock(),
                 "latest_frame": None,
+                "latest_hash": "",
                 "desired_buttons": set(),
                 "pressed_buttons": set(),
                 "tap_frames": {},
@@ -131,11 +111,9 @@ def get_room(name: str) -> dict:
 
 def presentation_delay_frames(button: str, action: str, queue_depth: int) -> int:
     if action == "tap":
-        settle_frames = TAP_SETTLE_FRAMES.get(button, 6)
-        return max(1, queue_depth * TAP_HOLD_FRAMES + settle_frames)
-
-    settle_frames = HELD_SETTLE_FRAMES.get(button, 2)
-    return max(1, settle_frames)
+        settle = TAP_SETTLE_FRAMES.get(button, 6)
+        return max(1, queue_depth * TAP_HOLD_FRAMES + settle)
+    return max(1, HELD_SETTLE_FRAMES.get(button, 2))
 
 
 def room_loop(room: dict) -> None:
@@ -144,43 +122,42 @@ def room_loop(room: dict) -> None:
         with room["lock"]:
             if not room["running"]:
                 return
-
             pyboy = room["pyboy"]
             if pyboy is None:
                 return
 
             if room["tap_queue"]:
-                next_button = room["tap_queue"].pop(0)
-                room["tap_frames"][next_button] = TAP_HOLD_FRAMES
+                nxt = room["tap_queue"].pop(0)
+                room["tap_frames"][nxt] = TAP_HOLD_FRAMES
 
-            desired_buttons = set(room["desired_buttons"]) | set(room["tap_frames"].keys())
-            pressed_buttons = set(room["pressed_buttons"])
-
-            for button in desired_buttons - pressed_buttons:
-                pyboy.button_press(button)
-            for button in pressed_buttons - desired_buttons:
-                pyboy.button_release(button)
+            desired = set(room["desired_buttons"]) | set(room["tap_frames"].keys())
+            pressed = set(room["pressed_buttons"])
+            for b in desired - pressed:
+                pyboy.button_press(b)
+            for b in pressed - desired:
+                pyboy.button_release(b)
 
             pyboy.tick()
             room["ticks"] += 1
-            room["pressed_buttons"] = desired_buttons
+            room["pressed_buttons"] = desired
 
-            next_tap_frames = {}
-            for button, frames_left in room["tap_frames"].items():
-                if frames_left > 1:
-                    next_tap_frames[button] = frames_left - 1
-            room["tap_frames"] = next_tap_frames
-            room["latest_frame"] = render_frame(pyboy)
-            due_versions = []
-            remaining_presentations = []
-            for version, ready_tick in room["pending_presentations"]:
-                if room["ticks"] >= ready_tick:
-                    due_versions.append(version)
+            next_tap = {b: f - 1 for b, f in room["tap_frames"].items() if f > 1}
+            room["tap_frames"] = next_tap
+
+            raw_frame = render_frame(pyboy)
+            room["latest_frame"] = raw_frame
+            room["latest_hash"] = frame_hash(raw_frame)
+
+            due = []
+            remaining = []
+            for ver, ready in room["pending_presentations"]:
+                if room["ticks"] >= ready:
+                    due.append(ver)
                 else:
-                    remaining_presentations.append((version, ready_tick))
-            room["pending_presentations"] = remaining_presentations
-            if due_versions:
-                room["frame_version"] = max(room["frame_version"], max(due_versions))
+                    remaining.append((ver, ready))
+            room["pending_presentations"] = remaining
+            if due:
+                room["frame_version"] = max(room["frame_version"], max(due))
                 room["last_frame_at"] = int(time.time() * 1000)
 
         time.sleep(frame_delay)
@@ -189,25 +166,18 @@ def room_loop(room: dict) -> None:
 def init_room(room: dict) -> None:
     if room["pyboy"] is not None:
         return
-
     logger.info("[room=%s] starting emulator", room["name"])
-    pyboy = PyBoy(
-        args.rom,
-        window="null",
-        sound_emulated=False,
-        sound_volume=0,
-        log_level="ERROR",
-    )
-    pyboy.set_emulation_speed(args.tick_rate)
+    pb = PyBoy(args.rom, window="null", sound_emulated=False, sound_volume=0, log_level="ERROR")
+    pb.set_emulation_speed(args.tick_rate)
     for _ in range(WARMUP_FRAMES):
-        pyboy.tick()
-
+        pb.tick()
     room["ticks"] = WARMUP_FRAMES
-    room["pyboy"] = pyboy
-    room["latest_frame"] = render_frame(pyboy)
+    room["pyboy"] = pb
+    frame = render_frame(pb)
+    room["latest_frame"] = frame
+    room["latest_hash"] = frame_hash(frame)
     room["last_frame_at"] = int(time.time() * 1000)
     room["running"] = True
-
     worker = threading.Thread(target=room_loop, args=(room,), daemon=True, name=f"room-{room['name']}")
     room["worker"] = worker
     worker.start()
@@ -217,10 +187,8 @@ def init_room(room: dict) -> None:
 def queue_input(room: dict, raw_button: str, raw_action: str) -> dict:
     with room["lock"]:
         init_room(room)
-
         button = BUTTON_MAP.get(str(raw_button).strip().lower())
         action = str(raw_action or "tap").strip().lower()
-
         if not button:
             raise ValueError(f"invalid button: {raw_button}")
         if action not in ACTION_MAP:
@@ -233,43 +201,47 @@ def queue_input(room: dict, raw_button: str, raw_action: str) -> dict:
         elif action == "release":
             room["desired_buttons"].discard(button)
             room["tap_frames"].pop(button, None)
-            room["tap_queue"] = [queued for queued in room["tap_queue"] if queued != button]
+            room["tap_queue"] = [b for b in room["tap_queue"] if b != button]
 
         room["input_version"] += 1
         room["last_input_at"] = int(time.time() * 1000)
-        queue_depth = len(room["tap_queue"])
-        ready_tick = room["ticks"] + presentation_delay_frames(button, action, queue_depth)
-        room["pending_presentations"].append((room["input_version"], ready_tick))
+        qd = len(room["tap_queue"])
+        ready = room["ticks"] + presentation_delay_frames(button, action, qd)
+        room["pending_presentations"].append((room["input_version"], ready))
 
         return {
             "button": button,
             "action": action,
-            "queueDepth": queue_depth,
+            "queueDepth": qd,
             "heldButtons": sorted(room["desired_buttons"]),
             "acceptedInputVersion": room["input_version"],
             "presentedFrameVersion": room["frame_version"],
+            "frameHash": room["latest_hash"],
             "lastInputAt": room["last_input_at"],
             "lastFrameAt": room["last_frame_at"],
         }
 
 
-def capture_frame(room: dict) -> bytes:
+def capture_frame(room: dict) -> tuple[bytes, str]:
     with room["lock"]:
         init_room(room)
         frame = room["latest_frame"]
+        h = room["latest_hash"]
         if frame is None:
             frame = render_frame(room["pyboy"])
+            h = frame_hash(frame)
             room["latest_frame"] = frame
-        return frame
+            room["latest_hash"] = h
+        return frame, h
 
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"
 
-    def log_message(self, fmt: str, *args) -> None:
+    def log_message(self, fmt, *args):
         logger.debug("%s " + fmt, self.client_address[0], *args)
 
-    def respond_json(self, body: dict, status: int = 200) -> None:
+    def respond_json(self, body, status=200):
         payload = json.dumps(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -277,7 +249,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def do_GET(self) -> None:
+    def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query)
@@ -285,7 +257,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/image":
             room = get_room(qs.get("room", ["main"])[0])
             try:
-                frame = capture_frame(room)
+                frame, h = capture_frame(room)
                 self.send_response(200)
                 self.send_header("Content-Type", "image/png")
                 self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -295,6 +267,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("X-Ticks", str(room["ticks"]))
                 self.send_header("X-Input-Version", str(room["input_version"]))
                 self.send_header("X-Frame-Version", str(room["frame_version"]))
+                self.send_header("X-Hash", h)
+                self.send_header("ETag", f'"{h}"')
                 self.send_header("X-Queue-Depth", str(len(room["tap_queue"])))
                 self.send_header("Content-Length", str(len(frame)))
                 self.end_headers()
@@ -304,7 +278,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(500, "Emulator error")
             return
 
-        if path == "/" or path == "/healthz":
+        if path in ("/", "/healthz"):
             self.respond_json({"ok": True, "service": "zo-gameboy"})
             return
 
@@ -329,37 +303,35 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/rooms":
             with lock:
                 info = {
-                    name: {
-                        "ticks": room["ticks"],
-                        "has_rom": room["pyboy"] is not None,
-                        "queueDepth": len(room["tap_queue"]),
-                        "heldButtons": sorted(room["desired_buttons"]),
-                        "acceptedInputVersion": room["input_version"],
-                        "presentedFrameVersion": room["frame_version"],
-                        "lastInputAt": room["last_input_at"],
-                        "lastFrameAt": room["last_frame_at"],
+                    n: {
+                        "ticks": r["ticks"],
+                        "has_rom": r["pyboy"] is not None,
+                        "queueDepth": len(r["tap_queue"]),
+                        "heldButtons": sorted(r["desired_buttons"]),
+                        "acceptedInputVersion": r["input_version"],
+                        "presentedFrameVersion": r["frame_version"],
+                        "frameHash": r["latest_hash"],
+                        "lastInputAt": r["last_input_at"],
+                        "lastFrameAt": r["last_frame_at"],
                     }
-                    for name, room in rooms.items()
+                    for n, r in rooms.items()
                 }
             self.respond_json(info)
             return
 
         self.send_error(404)
 
-    def do_POST(self) -> None:
+    def do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path != "/input":
             self.send_error(404)
             return
-
         try:
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length)
             body = json.loads(raw.decode() if raw else "{}")
             room = get_room(str(body.get("room", "main")))
-            button = str(body.get("button", ""))
-            action = str(body.get("action", "tap"))
-            result = queue_input(room, button, action)
+            result = queue_input(room, str(body.get("button", "")), str(body.get("action", "tap")))
             self.respond_json({"ok": True, "room": room["name"], **result})
         except Exception:
             logger.exception("input request failed")
@@ -383,6 +355,6 @@ except KeyboardInterrupt:
                     workers.append(room["worker"])
                 if room["pyboy"] is not None:
                     room["pyboy"].stop()
-    for worker in workers:
-        worker.join(timeout=1)
+    for w in workers:
+        w.join(timeout=1)
     server.shutdown()

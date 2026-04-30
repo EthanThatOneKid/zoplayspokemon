@@ -697,9 +697,8 @@ export default function ZoPlaysPokemonPage() {
         <div className="rounded-[28px] border border-black/10 bg-[#d8d8b8] px-4 py-5 shadow-[0_18px_38px_rgba(0,0,0,0.18)]">
           <div className="zp-frame-glow rounded-[26px] border border-black/20 bg-[#bcbca0] p-3">
             <div className="rounded-[22px] border border-[#4e4e3b] bg-[#202020] px-3 pb-4 pt-3">
-              <div className="mb-2 flex items-center justify-between text-[11px] text-[#c8c8a8]">
-                <span className="zp-font-mono">BENTO TRAY SCREEN</span>
-                <span>{visibleQueueCount > 0 ? "SYNCING INPUT" : "LIVE FEED"}</span>
+              <div className="mb-2 flex items-center justify-end gap-2 text-[11px] text-[#c8c8a8]">
+                <span className="zp-font-mono">{visibleQueueCount > 0 ? "SYNCING INPUT" : "LIVE FEED"}</span>
               </div>
               <div className="relative aspect-[10/9] overflow-hidden rounded-[16px] border border-[#608080] bg-[#002020]">
                 <img
