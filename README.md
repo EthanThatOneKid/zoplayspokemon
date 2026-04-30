@@ -1,10 +1,10 @@
 # zoplayspokemon
 
-A collaborative shared Pokemon play room on Zo Space. Multiple visitors in the same room control one self-hosted game session running on Zo.
+An educational mirror repo for a collaborative emulator-control experiment on Zo Space. The focus is the input pipeline, frame-sync behavior, and hosted emulator UX rather than distributing a branded game experience.
 
-**Live:** [https://etok.zo.space/zoplayspokemon](https://etok.zo.space/zoplayspokemon)
-
-> **Zo Space mirror repo:** this repository mirrors the live Zo Space route family behind `https://etok.zo.space/zoplayspokemon` and its related API endpoints. The repo should reflect the currently deployed experience.
+> **Status:** public framing is being narrowed toward an educational systems demo. See issue #1 for the current repositioning work.
+>
+> **Zo Space mirror repo:** this repository mirrors the live Zo Space route family behind `https://etok.zo.space/zoplayspokemon` and its related API endpoints. The repo should reflect the currently deployed experience, while public documentation should avoid presenting the project as a redistributable commercial-game experience.
 
 ## Routes
 
@@ -14,6 +14,18 @@ A collaborative shared Pokemon play room on Zo Space. Multiple visitors in the s
 | `/api/zoplayspokemon-state` | API | GET — returns recent input events + long-poll frame/input metadata |
 | `/api/zoplayspokemon-input` | API | POST — send a tap, press, or release |
 | `/api/zoplayspokemon-frame` | API | GET — returns the latest proxied PNG frame |
+
+## Public Positioning
+
+This repository documents a technical experiment in:
+
+- remote input coordination
+- shared-room state fanout
+- frame polling and refresh signaling
+- latency management for emulator-backed UIs
+- hosted game-loop orchestration on Zo
+
+For public-facing demos and documentation, prefer original, public-domain, or otherwise redistributable content. Avoid framing the project as a way to publicly play or redistribute copyrighted commercial games.
 
 ## How It Works
 
@@ -28,8 +40,8 @@ A collaborative shared Pokemon play room on Zo Space. Multiple visitors in the s
 
 - Hosted emulator service: `https://zo-gameboy-etok.zocomputer.io`
 - Service source: `server/zo_gameboy_server.py`
-- The current hosted entrypoint uses PyBoy with `roms/pokemon-crystal.gbc`
-- `roms/PlantBoy.gb` remains in the repo as an alternate local ROM
+- `roms/PlantBoy.gb` is the preferred safer demo ROM for public-facing documentation
+- The current hosted entrypoint may still be pointed at other local ROMs during private experimentation; public docs should not rely on or promote copyrighted commercial game content
 - Rooms are addressed with `?room=main` or any short room name
 - To swap ROMs, point the hosted service entrypoint at the desired file in `roms/`
 
@@ -81,3 +93,7 @@ Returns `{ "ok": true, "event": { ... } }` on success, or `{ "error": "..." }` o
 ## Development
 
 Sync with the `zopack` skill in `code/workspace-root/Skills/zopack/`.
+
+## Tracking
+
+- Repositioning issue: `#1` — pivot public framing away from a Pokemon-specific playable experience
