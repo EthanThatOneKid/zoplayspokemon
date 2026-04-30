@@ -67,6 +67,8 @@ type Position = {
   y: number;
 };
 
+type ControlPanelTab = "play" | "settings" | "about";
+
 const BUTTONS: ButtonDef[] = [
   { label: "UP", code: "2", hint: "Arrow Up / W", kind: "dpad" },
   { label: "LEFT", code: "1", hint: "Arrow Left / A", kind: "dpad" },
@@ -116,6 +118,7 @@ const BURST_WINDOW_MS = 1200;
 const THEME_STORAGE_KEY = "zoplayspokemon.theme";
 const CONTROLLER_POSITION_STORAGE_KEY = "zoplayspokemon.controllerPosition";
 const CONTROLLER_MINIMIZED_STORAGE_KEY = "zoplayspokemon.controllerMinimized";
+const REPO_URL = "https://github.com/EthanThatOneKid/zoplayspokemon";
 
 const THEME_PRESETS: ThemePreset[] = [
   {
@@ -549,7 +552,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function getEstimatedControllerSize(minimized: boolean): { height: number; width: number } {
-  return minimized ? { width: 236, height: 72 } : { width: 352, height: 368 };
+  return minimized ? { width: 236, height: 72 } : { width: 392, height: 560 };
 }
 
 function getDefaultControllerPosition(minimized: boolean): Position {
@@ -729,9 +732,9 @@ export default function ZoPlaysPokemonPage() {
   const [frameLoading, setFrameLoading] = useState(true);
   const [themeId, setThemeId] = useState(THEME_PRESETS[0].id);
   const [themeReady, setThemeReady] = useState(false);
-  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
   const [controllerMinimized, setControllerMinimized] = useState(false);
   const [controllerPosition, setControllerPosition] = useState<Position | null>(null);
+  const [panelTab, setPanelTab] = useState<ControlPanelTab>("play");
   const user = useMemo(() => Math.random().toString(36).slice(2, 8), []);
   const frameHashRef = useRef("");
   const frameVersionRef = useRef(0);
@@ -751,7 +754,7 @@ export default function ZoPlaysPokemonPage() {
   const currentTheme = THEME_LOOKUP[themeId] || THEME_PRESETS[0];
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
   const visibleQueueCount = Math.max(queueCount, queueDepth);
-  const controlsDisabled = visibleQueueCount > 0;
+  const controlsDisabled = visibleQueueCount > 0 || panelTab !== "play";
 
   const measureController = (minimized: boolean) => {
     const rect = controllerRef.current?.getBoundingClientRect();
@@ -765,6 +768,12 @@ export default function ZoPlaysPokemonPage() {
     const basePosition = nextPosition || getDefaultControllerPosition(minimized);
     const { width, height } = measureController(minimized);
     return clampControllerPosition(basePosition, width, height);
+  };
+
+  const openControllerPanel = (nextTab: ControlPanelTab) => {
+    setControllerMinimized(false);
+    setPanelTab(nextTab);
+    setControllerPosition((current) => normalizeControllerPosition(current, false));
   };
 
   const refreshFrame = async (force = false) => {
@@ -1153,7 +1162,7 @@ export default function ZoPlaysPokemonPage() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (themeDialogOpen || !keyboardEnabled) return;
+      if (panelTab !== "play" || !keyboardEnabled) return;
       const code = KEY_TO_CODE[event.key];
       if (!code) return;
       event.preventDefault();
@@ -1169,18 +1178,7 @@ export default function ZoPlaysPokemonPage() {
         window.clearTimeout(pendingTimeoutRef.current);
       }
     };
-  }, [keyboardEnabled, room, themeDialogOpen]);
-
-  useEffect(() => {
-    if (!themeDialogOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setThemeDialogOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [themeDialogOpen]);
+  }, [keyboardEnabled, panelTab, room]);
 
   useEffect(() => {
     burstPollIdRef.current += 1;
@@ -1204,6 +1202,7 @@ export default function ZoPlaysPokemonPage() {
     clearPendingInput();
     frameLoadingRef.current = true;
     setFrameLoading(true);
+    setPanelTab("play");
     void refreshFrame(true);
   }, [room]);
 
@@ -1244,7 +1243,7 @@ export default function ZoPlaysPokemonPage() {
             <div className="flex flex-col items-stretch gap-2">
               <button
                 type="button"
-                onClick={() => setThemeDialogOpen(true)}
+                onClick={() => openControllerPanel("settings")}
                 className="rounded-full px-3 py-2 text-left transition"
                 style={{
                   background: "var(--chip)",
@@ -1252,30 +1251,26 @@ export default function ZoPlaysPokemonPage() {
                 }}
               >
                 <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                  THEME
+                  DECK MENU
                 </div>
                 <div className="mt-1 text-[14px] leading-4" style={{ color: "var(--text-strong)" }}>
-                  {currentTheme.name}
+                  Settings + About
                 </div>
               </button>
               <button
                 type="button"
-                aria-pressed={keyboardEnabled}
-                onClick={() => setKeyboardEnabled((current) => !current)}
+                onClick={() => openControllerPanel("about")}
                 className="min-w-[118px] rounded-full px-3 py-2 text-left transition"
                 style={{
-                  background: keyboardEnabled ? "var(--chip-alt)" : "var(--chip-soft)",
-                  boxShadow: keyboardEnabled
-                    ? "inset 2px 2px 0 rgba(255,255,255,0.45), inset -2px -2px 0 rgba(140,48,40,0.22)"
-                    : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
+                  background: "var(--chip-soft)",
+                  boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
                 }}
-                title="Opt in if you want keyboard controls."
               >
                 <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                  KEYBOARD: {keyboardEnabled ? "ON" : "OFF"}
+                  HOW THIS WORKS
                 </div>
                 <div className="mt-1 text-[14px] leading-4" style={{ color: "var(--text-muted)" }}>
-                  Opt in to avoid accidental inputs.
+                  Rooms, repo, and features.
                 </div>
               </button>
             </div>
@@ -1423,7 +1418,7 @@ export default function ZoPlaysPokemonPage() {
               left: controllerPosition.x,
               top: controllerPosition.y,
               maxWidth: "calc(100vw - 24px)",
-              width: controllerMinimized ? "236px" : "352px",
+              width: controllerMinimized ? "236px" : "392px",
             }}
           >
             {controllerMinimized ? (
@@ -1473,10 +1468,12 @@ export default function ZoPlaysPokemonPage() {
                     </button>
                     <div>
                       <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                        FLOATING CONTROLS
+                        FLOATING CONTROL DECK
                       </div>
                       <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-                        Drag the deck wherever it fits your screen.
+                        {panelTab === "play"
+                          ? "Drag the deck wherever it fits your screen."
+                          : "Settings and docs pause button input until you return to Play."}
                       </p>
                     </div>
                   </div>
@@ -1504,180 +1501,311 @@ export default function ZoPlaysPokemonPage() {
                   <div className="rounded-full px-3 py-1 text-[14px] leading-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
                     {currentTheme.name} · {room}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => tap("7")}
-                    disabled={controlsDisabled}
-                    className="rounded-full px-4 py-2 transition disabled:cursor-wait disabled:opacity-70"
-                    style={{
-                      background: "var(--shell-warm)",
-                      color: "var(--text-strong)",
-                      boxShadow: controlsDisabled
-                        ? "inset 2px 2px 0 rgba(0,0,0,0.12)"
-                        : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.18)",
-                    }}
-                  >
-                    <span className="zp-font-mono text-[10px]">QUICK START</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {(["play", "settings", "about"] as ControlPanelTab[]).map((tab) => {
+                      const active = panelTab === tab;
+                      return (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setPanelTab(tab)}
+                          className="rounded-full px-3 py-2 transition"
+                          style={{
+                            background: active ? "var(--shell-warm)" : "var(--chip-soft)",
+                            color: "var(--text-strong)",
+                            boxShadow: active
+                              ? "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14)"
+                              : "inset 2px 2px 0 rgba(255,255,255,0.22), inset -2px -2px 0 rgba(0,0,0,0.08)",
+                          }}
+                        >
+                          <span className="zp-font-mono text-[9px]">{tab.toUpperCase()}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between gap-4">
-                  <div className="grid grid-cols-3 gap-2 rounded-[22px] p-3" style={{ background: "var(--shell-secondary)" }}>
-                    <div />
-                    <DpadButton
-                      label="UP"
-                      active={pendingTapCode === "2"}
-                      disabled={controlsDisabled}
-                      onPress={beginPointerPress("2")}
-                    />
-                    <div />
-                    <DpadButton
-                      label="LEFT"
-                      active={pendingTapCode === "1"}
-                      disabled={controlsDisabled}
-                      onPress={beginPointerPress("1")}
-                    />
-                    <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
-                    <DpadButton
-                      label="RIGHT"
-                      active={pendingTapCode === "0"}
-                      disabled={controlsDisabled}
-                      onPress={beginPointerPress("0")}
-                    />
-                    <div />
-                    <DpadButton
-                      label="DOWN"
-                      active={pendingTapCode === "3"}
-                      disabled={controlsDisabled}
-                      onPress={beginPointerPress("3")}
-                    />
-                    <div />
-                  </div>
-
-                  <div className="flex -rotate-12 flex-col items-center gap-4">
-                    {actionButtons.map((button) => (
-                      <ActionButton
-                        key={button.code}
-                        button={button}
-                        active={pendingTapCode === button.code}
+                {panelTab === "play" ? (
+                  <>
+                    <div className="mt-4 flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => tap("7")}
                         disabled={controlsDisabled}
-                        onPress={beginPointerPress(button.code)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 flex items-center justify-center gap-4">
-                  {menuButtons.map((button) => (
-                    <MenuButton
-                      key={button.code}
-                      label={button.label}
-                      active={pendingTapCode === button.code}
-                      disabled={controlsDisabled}
-                      onClick={pressMenuButton(button.code)}
-                    />
-                  ))}
-                </div>
-
-                <div className="mt-4 grid gap-2 text-[14px] leading-4 sm:grid-cols-2" style={{ color: "var(--text-soft)" }}>
-                  {BUTTONS.map((button) => (
-                    <div key={button.code} className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)" }}>
-                      <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>
-                        {button.label}
-                      </span>
-                      <span className="ml-2">{button.hint}</span>
+                        className="rounded-full px-4 py-2 transition disabled:cursor-wait disabled:opacity-70"
+                        style={{
+                          background: "var(--shell-warm)",
+                          color: "var(--text-strong)",
+                          boxShadow: controlsDisabled
+                            ? "inset 2px 2px 0 rgba(0,0,0,0.12)"
+                            : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.18)",
+                        }}
+                      >
+                        <span className="zp-font-mono text-[10px]">QUICK START</span>
+                      </button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : null}
 
-        {themeDialogOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-            <div
-              className="w-full max-w-[560px] rounded-[28px] border border-black/10 px-4 py-4 shadow-[0_20px_48px_rgba(0,0,0,0.28)]"
-              style={{ background: "var(--shell-primary)" }}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                    GAME BOY COLOR THEMES
-                  </div>
-                  <h2 className="mt-2 text-[22px] leading-5" style={{ color: "var(--text-strong)" }}>
-                    Pick a retail shell or let it roll random.
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setThemeDialogOpen(false)}
-                  className="rounded-full px-3 py-2 transition"
-                  style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
-                >
-                  <span className="zp-font-mono text-[9px]">CLOSE</span>
-                </button>
-              </div>
+                    <div className="mt-5 flex items-center justify-between gap-4">
+                      <div className="grid grid-cols-3 gap-2 rounded-[22px] p-3" style={{ background: "var(--shell-secondary)" }}>
+                        <div />
+                        <DpadButton
+                          label="UP"
+                          active={pendingTapCode === "2"}
+                          disabled={controlsDisabled}
+                          onPress={beginPointerPress("2")}
+                        />
+                        <div />
+                        <DpadButton
+                          label="LEFT"
+                          active={pendingTapCode === "1"}
+                          disabled={controlsDisabled}
+                          onPress={beginPointerPress("1")}
+                        />
+                        <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
+                        <DpadButton
+                          label="RIGHT"
+                          active={pendingTapCode === "0"}
+                          disabled={controlsDisabled}
+                          onPress={beginPointerPress("0")}
+                        />
+                        <div />
+                        <DpadButton
+                          label="DOWN"
+                          active={pendingTapCode === "3"}
+                          disabled={controlsDisabled}
+                          onPress={beginPointerPress("3")}
+                        />
+                        <div />
+                      </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {THEME_PRESETS.map((theme) => {
-                  const selected = theme.id === themeId;
-                  return (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => {
-                        setThemeId(theme.id);
-                        setThemeDialogOpen(false);
-                      }}
-                      className="rounded-[20px] border px-4 py-4 text-left transition"
-                      style={{
-                        borderColor: selected ? "var(--text-strong)" : "rgba(0,0,0,0.08)",
-                        background: selected ? "var(--panel-soft)" : "var(--chip-soft)",
-                        boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.08) inset" : "none",
-                      }}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                            {selected ? "ACTIVE" : "RETAIL"}
-                          </div>
-                          <div className="mt-2 text-[18px] leading-4" style={{ color: "var(--text-strong)" }}>
-                            {theme.name}
-                          </div>
+                      <div className="flex -rotate-12 flex-col items-center gap-4">
+                        {actionButtons.map((button) => (
+                          <ActionButton
+                            key={button.code}
+                            button={button}
+                            active={pendingTapCode === button.code}
+                            disabled={controlsDisabled}
+                            onPress={beginPointerPress(button.code)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-center gap-4">
+                      {menuButtons.map((button) => (
+                        <MenuButton
+                          key={button.code}
+                          label={button.label}
+                          active={pendingTapCode === button.code}
+                          disabled={controlsDisabled}
+                          onClick={pressMenuButton(button.code)}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="mt-4 grid gap-2 text-[14px] leading-4 sm:grid-cols-2" style={{ color: "var(--text-soft)" }}>
+                      {BUTTONS.map((button) => (
+                        <div key={button.code} className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)" }}>
+                          <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>
+                            {button.label}
+                          </span>
+                          <span className="ml-2">{button.hint}</span>
                         </div>
-                        <div className="flex gap-1">
-                          {theme.swatches.map((swatch) => (
-                            <span
-                              key={swatch}
-                              className="zp-swatch block h-5 w-5 rounded-full"
-                              style={{ background: swatch }}
-                            />
-                          ))}
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+
+                {panelTab === "settings" ? (
+                  <div className="mt-5 space-y-3 text-[15px] leading-4">
+                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+                      Button inputs are paused while you change controller settings.
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        aria-pressed={keyboardEnabled}
+                        onClick={() => setKeyboardEnabled((current) => !current)}
+                        className="rounded-[18px] px-4 py-4 text-left transition"
+                        style={{
+                          background: keyboardEnabled ? "var(--chip-alt)" : "var(--chip-soft)",
+                          boxShadow: keyboardEnabled
+                            ? "inset 2px 2px 0 rgba(255,255,255,0.45), inset -2px -2px 0 rgba(140,48,40,0.22)"
+                            : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
+                        }}
+                        title="Opt in if you want keyboard controls."
+                      >
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          KEYBOARD: {keyboardEnabled ? "ON" : "OFF"}
+                        </div>
+                        <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                          {keyboardEnabled ? "Keyboard play is armed." : "Keyboard play is blocked."}
+                        </div>
+                        <div className="mt-2" style={{ color: "var(--text-muted)" }}>
+                          Opt in to avoid accidental inputs while browsing.
+                        </div>
+                      </button>
+
+                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          DECK POSITION
+                        </div>
+                        <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                          Keep the controller out of the screen area.
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={resetControllerPosition}
+                            className="rounded-full px-3 py-2 transition"
+                            style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                          >
+                            <span className="zp-font-mono text-[9px]">RESET POSITION</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setControllerMinimized(true)}
+                            className="rounded-full px-3 py-2 transition"
+                            style={{ background: "var(--chip)", color: "var(--text-strong)" }}
+                          >
+                            <span className="zp-font-mono text-[9px]">MINIMIZE</span>
+                          </button>
                         </div>
                       </div>
-                      <p className="mt-3 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-                        {theme.note}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
+                    </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={randomizeTheme}
-                  className="rounded-full px-4 py-2 transition"
-                  style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
-                >
-                  <span className="zp-font-mono text-[10px]">RANDOMIZE THEME</span>
-                </button>
-                <p className="text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-                  First visit picks one at random. After that, your browser keeps the choice.
-                </p>
+                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                            THEME
+                          </div>
+                          <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                            {currentTheme.name}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={randomizeTheme}
+                          className="rounded-full px-3 py-2 transition"
+                          style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                        >
+                          <span className="zp-font-mono text-[9px]">RANDOMIZE</span>
+                        </button>
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {THEME_PRESETS.map((theme) => {
+                          const selected = theme.id === themeId;
+                          return (
+                            <button
+                              key={theme.id}
+                              type="button"
+                              onClick={() => setThemeId(theme.id)}
+                              className="rounded-[16px] border px-3 py-3 text-left transition"
+                              style={{
+                                borderColor: selected ? "var(--text-strong)" : "rgba(0,0,0,0.08)",
+                                background: selected ? "var(--panel-soft)" : "rgba(255,255,255,0.18)",
+                                boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.08) inset" : "none",
+                              }}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                                    {selected ? "ACTIVE" : "RETAIL"}
+                                  </div>
+                                  <div className="mt-2 text-[16px]" style={{ color: "var(--text-strong)" }}>
+                                    {theme.name}
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  {theme.swatches.map((swatch) => (
+                                    <span
+                                      key={swatch}
+                                      className="zp-swatch block h-4 w-4 rounded-full"
+                                      style={{ background: swatch }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
+                                {theme.note}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {panelTab === "about" ? (
+                  <div className="mt-5 space-y-3 text-[15px] leading-4">
+                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                      <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                        ABOUT THIS ROOM
+                      </div>
+                      <p className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                        Every room runs one shared Pokemon Crystal session. Anyone visiting the same `?room=` value joins that exact game state.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          ROOM MODEL
+                        </div>
+                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                          `main` is the default lobby. Any short room name creates a separate shared play space with its own emulator loop.
+                        </p>
+                      </div>
+                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          INPUT + FRAME SYNC
+                        </div>
+                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                          The page long-polls room state, tracks frame versions and hashes, and refreshes the PNG only when a newer frame is ready.
+                        </p>
+                      </div>
+                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          CUSTOMIZATION
+                        </div>
+                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                          Theme presets, keyboard opt-in, and the floating draggable controller are all saved in your browser.
+                        </p>
+                      </div>
+                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          BACKEND
+                        </div>
+                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                          A hosted PyBoy service runs the emulator, while Zo Space serves the controller UI and API routes that proxy room state, input, and frames.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                      <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                        SOURCE
+                      </div>
+                      <a
+                        href={REPO_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex rounded-full px-4 py-2 transition"
+                        style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                      >
+                        <span className="zp-font-mono text-[9px]">OPEN GITHUB REPO</span>
+                      </a>
+                      <p className="mt-3" style={{ color: "var(--text-muted)" }}>
+                        Mirror repo for the live Zo Space routes and the emulator service source.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            </div>
+            )}
           </div>
         ) : null}
 
