@@ -28,9 +28,10 @@ A collaborative shared Pokemon play room on Zo Space. Multiple visitors in the s
 
 - Hosted emulator service: `https://zo-gameboy-etok.zocomputer.io`
 - Service source: `server/zo_gameboy_server.py`
-- The service uses PyBoy and the bundled `roms/PlantBoy.gb` ROM
+- The current hosted entrypoint uses PyBoy with `roms/pokemon-crystal.gbc`
+- `roms/PlantBoy.gb` remains in the repo as an alternate local ROM
 - Rooms are addressed with `?room=main` or any short room name
-- To swap ROMs, upload a `.gb` file into `roms/` and point `ZO_GAMEBOY_ROM` at it in the hosted service config
+- To swap ROMs, point the hosted service entrypoint at the desired file in `roms/`
 
 ## API Reference
 

@@ -8,6 +8,7 @@ Collaborative shared Pokemon play room backed by Ethan's own hosted emulator ser
 
 This repo mirrors the live Zo Space route set for Zo Plays Pokemon, including the page and related API endpoints.
 Keep route edits and repo commits synced so the repo stays aligned with production.
+The live route already includes the retail theme presets, floating controller UI, and frame-sync overhaul commits from April 29-30, 2026.
 
 ## Routes
 
