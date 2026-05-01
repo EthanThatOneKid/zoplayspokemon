@@ -14,6 +14,7 @@ An educational mirror repo for a collaborative Pokemon emulator-control experime
 | `/api/zoplayspokemon-state` | API | GET — returns recent input events + long-poll frame/input metadata |
 | `/api/zoplayspokemon-input` | API | POST — send a tap, press, or release |
 | `/api/zoplayspokemon-frame` | API | GET — returns the latest proxied PNG frame |
+| `/api/zoplayspokemon-share` | API | GET — server-rendered room share HTML with dynamic OGP image + live stats description |
 
 ## Public Positioning
 
@@ -79,6 +80,16 @@ Returns current game state and recent input log.
 - `user`: string — anonymous visitor ID
 
 Returns `{ "ok": true, "event": { ... } }` on success, or `{ "error": "..." }` on failure.
+
+### `GET /api/zoplayspokemon-share`
+
+Returns HTML for link unfurls and immediately forwards humans to the live room page.
+
+- query param: `room` — room identifier, defaults to `main`
+- `og:image` points at the current room frame via `/api/zoplayspokemon-frame`
+- `og:description` summarizes recent live state from the hosted room metadata
+
+Use this URL when sharing a room if you want Discord/X/OGP testers to show the actual current frame instead of Zo Space's default generic card.
 
 ## Secrets
 

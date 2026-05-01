@@ -21,7 +21,7 @@ export default async (c: Context) => {
       status: 304,
       headers: {
         ETag: etag,
-        "Cache-Control": "private, no-cache, must-revalidate",
+        "Cache-Control": "public, no-cache, must-revalidate",
         Vary: "If-None-Match",
         "X-Frame-Hash": frameHash,
         "X-Input-Version": inputVersion,
@@ -35,7 +35,7 @@ export default async (c: Context) => {
     status: upstream.status,
     headers: {
       "Content-Type": upstream.headers.get("content-type") || "image/png",
-      "Cache-Control": "private, no-cache, must-revalidate",
+      "Cache-Control": "public, no-cache, must-revalidate",
       ETag: etag,
       Vary: "If-None-Match",
       "X-Frame-Hash": frameHash,

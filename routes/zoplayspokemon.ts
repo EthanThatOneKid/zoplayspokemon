@@ -121,6 +121,7 @@ const CONTROLLER_MINIMIZED_STORAGE_KEY = "zoplayspokemon.controllerMinimized";
 const ACTIVITY_POSITION_STORAGE_KEY = "zoplayspokemon.activityPosition";
 const ACTIVITY_MINIMIZED_STORAGE_KEY = "zoplayspokemon.activityMinimized";
 const REPO_URL = "https://github.com/EthanThatOneKid/zoplayspokemon";
+const SHARE_URL_BASE = "/api/zoplayspokemon-share";
 
 function roomPlayerNameStorageKey(room: string): string {
   return `zoplayspokemon.playerName.${room}`;
@@ -765,6 +766,7 @@ export default function ZoPlaysPokemonPage() {
   const [draggingController, setDraggingController] = useState(false);
   const [draggingActivity, setDraggingActivity] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [shareStatus, setShareStatus] = useState("");
 
   const frameHashRef = useRef("");
   const frameVersionRef = useRef(0);
@@ -788,6 +790,10 @@ export default function ZoPlaysPokemonPage() {
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
   const visibleQueueCount = Math.max(queueCount, queueDepth);
   const controlsDisabled = visibleQueueCount > 0 || panelTab !== "play";
+  const sharePreviewUrl =
+    typeof window === "undefined"
+      ? `${SHARE_URL_BASE}?room=${encodeURIComponent(room)}`
+      : `${window.location.origin}${SHARE_URL_BASE}?room=${encodeURIComponent(room)}`;
 
   const measureController = (minimized: boolean) => {
     const rect = controllerRef.current?.getBoundingClientRect();
@@ -1083,6 +1089,15 @@ export default function ZoPlaysPokemonPage() {
     setThemeId((current) => pickRandomThemeId(current));
   };
 
+  const copySharePreviewUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(sharePreviewUrl);
+      setShareStatus("Preview link copied.");
+    } catch {
+      setShareStatus("Copy failed.");
+    }
+  };
+
   const resetControllerPosition = () => {
     setControllerPosition(normalizeControllerPosition(getDefaultControllerPosition(controllerMinimized), controllerMinimized));
   };
@@ -1288,6 +1303,12 @@ export default function ZoPlaysPokemonPage() {
     const timer = window.setTimeout(() => setError(""), 3000);
     return () => window.clearTimeout(timer);
   }, [error]);
+
+  useEffect(() => {
+    if (!shareStatus) return;
+    const timer = window.setTimeout(() => setShareStatus(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [shareStatus]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1875,6 +1896,28 @@ export default function ZoPlaysPokemonPage() {
             </span>
             <span className="rounded-full px-3 py-1" style={{ background: "var(--chip-soft)" }}>
               FRAME {frameVersion} · {lastFrameAt ? new Date(lastFrameAt).toLocaleTimeString() : "waiting"}
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void copySharePreviewUrl()}
+              className="rounded-full px-4 py-2 transition"
+              style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+            >
+              <span className="zp-font-mono text-[9px]">COPY SHARE PREVIEW LINK</span>
+            </button>
+            <a
+              href={sharePreviewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full px-4 py-2 transition"
+              style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
+            >
+              <span className="zp-font-mono text-[9px]">OPEN PREVIEW LINK</span>
+            </a>
+            <span className="text-[14px]" style={{ color: shareStatus ? "var(--text-strong)" : "var(--text-muted)" }}>
+              {shareStatus || "Use this link for room-aware unfurls."}
             </span>
           </div>
         </div>

@@ -21,6 +21,7 @@ The live route already includes the retail theme presets, floating controller UI
 | `/api/zoplayspokemon-state` | api | GET recent button events |
 | `/api/zoplayspokemon-input` | api | POST a tap, press, or release → upstream service |
 | `/api/zoplayspokemon-frame` | api | GET proxied PNG frame for a room |
+| `/api/zoplayspokemon-share` | api | GET server-rendered share HTML for room-aware OGP unfurls |
 
 ## State
 
