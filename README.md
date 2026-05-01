@@ -35,7 +35,7 @@ The documented system works like this:
 
 - the page captures button activity from touch, mouse, or keyboard input
 - `/api/zoplayspokemon-input` forwards that activity to Ethan's hosted emulator service on Zo
-- the emulator service runs a per-room loop, queues taps, and maintains held-button state
+- the emulator service runs a per-room loop, queues taps, maintains held-button state, and checkpoints each room to disk
 - `/api/zoplayspokemon-state` long-polls for fresher input and frame metadata
 - the page refreshes the PNG feed only when the backend reports a newer accepted input or frame
 
@@ -43,7 +43,7 @@ The documented system works like this:
 
 - Hosted emulator service: `https://zo-gameboy-etok.zocomputer.io`
 - Service source: `server/zo_gameboy_server.py`
-- The live system supports room-scoped sessions; this repo discusses that behavior as part of the case study, not as a deployment recommendation.
+- The live system supports room-scoped sessions with per-room snapshot persistence; this repo discusses that behavior as part of the case study, not as a deployment recommendation.
 
 The repository includes `roms/PlantBoy.gb` (a free homebrew Game Boy title) for reference. Live deployments use Pokémon ROMs (e.g., `pokemon-crystal.gbc`), which are not included in this repository (see `.gitignore`) due to copyright. The repo may reference or discuss ROM choices as part of documenting what exists, but it should not coach readers through reproducing the setup with copyrighted game content.
 
@@ -89,7 +89,7 @@ Returns `{ "ok": true, "event": { ... } }` on success, or `{ "error": "..." }` o
 
 - **Framework:** Zo Space (Hono + React on Bun)
 - **Hosted game service:** PyBoy-backed HTTP server at `https://zo-gameboy-etok.zocomputer.io`
-- **State:** In-memory global on the Bun server (resets on restart)
+- **State:** In-memory global on the Bun server (resets on restart) plus per-room PyBoy snapshots on the Python service
 - **Styling:** Tailwind CSS 4
 
 ## Development
