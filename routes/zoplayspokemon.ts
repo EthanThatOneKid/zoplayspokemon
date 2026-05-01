@@ -118,6 +118,8 @@ const BURST_WINDOW_MS = 1200;
 const THEME_STORAGE_KEY = "zoplayspokemon.theme";
 const CONTROLLER_POSITION_STORAGE_KEY = "zoplayspokemon.controllerPosition";
 const CONTROLLER_MINIMIZED_STORAGE_KEY = "zoplayspokemon.controllerMinimized";
+const ACTIVITY_POSITION_STORAGE_KEY = "zoplayspokemon.activityPosition";
+const ACTIVITY_MINIMIZED_STORAGE_KEY = "zoplayspokemon.activityMinimized";
 const REPO_URL = "https://github.com/EthanThatOneKid/zoplayspokemon";
 
 function roomPlayerNameStorageKey(room: string): string {
@@ -559,6 +561,10 @@ function getEstimatedControllerSize(minimized: boolean): { height: number; width
   return minimized ? { width: 236, height: 72 } : { width: 392, height: 560 };
 }
 
+function getEstimatedActivitySize(minimized: boolean): { height: number; width: number } {
+  return minimized ? { width: 250, height: 72 } : { width: 352, height: 420 };
+}
+
 function getDefaultControllerPosition(minimized: boolean): Position {
   const { width, height } = getEstimatedControllerSize(minimized);
   const viewportWidth = window.innerWidth;
@@ -572,7 +578,20 @@ function getDefaultControllerPosition(minimized: boolean): Position {
   };
 }
 
-function clampControllerPosition(position: Position, width: number, height: number): Position {
+function getDefaultActivityPosition(minimized: boolean): Position {
+  const { width, height } = getEstimatedActivitySize(minimized);
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const margin = 12;
+  const desiredX = viewportWidth < 640 ? (viewportWidth - width) / 2 : 20;
+  const desiredY = viewportHeight - height - 28;
+  return {
+    x: clamp(desiredX, margin, Math.max(margin, viewportWidth - width - margin)),
+    y: clamp(desiredY, margin, Math.max(margin, viewportHeight - height - margin)),
+  };
+}
+
+function clampPanelPosition(position: Position, width: number, height: number): Position {
   const margin = 12;
   return {
     x: clamp(position.x, margin, Math.max(margin, window.innerWidth - width - margin)),
@@ -739,9 +758,12 @@ export default function ZoPlaysPokemonPage() {
   const [themeReady, setThemeReady] = useState(false);
   const [controllerMinimized, setControllerMinimized] = useState(false);
   const [controllerPosition, setControllerPosition] = useState<Position | null>(null);
+  const [activityMinimized, setActivityMinimized] = useState(false);
+  const [activityPosition, setActivityPosition] = useState<Position | null>(null);
   const [panelTab, setPanelTab] = useState<ControlPanelTab>("play");
   const [playerName, setPlayerName] = useState("guest");
   const [draggingController, setDraggingController] = useState(false);
+  const [draggingActivity, setDraggingActivity] = useState(false);
   const frameHashRef = useRef("");
   const frameVersionRef = useRef(0);
   const inputVersionRef = useRef(0);
@@ -756,7 +778,9 @@ export default function ZoPlaysPokemonPage() {
   const frameFetchIdRef = useRef(0);
   const hasFrameRef = useRef(false);
   const controllerRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
+  const activityRef = useRef<HTMLDivElement | null>(null);
+  const controllerDragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
+  const activityDragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
 
   const currentTheme = THEME_LOOKUP[themeId] || THEME_PRESETS[0];
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
@@ -774,7 +798,21 @@ export default function ZoPlaysPokemonPage() {
   const normalizeControllerPosition = (nextPosition: Position | null, minimized: boolean) => {
     const basePosition = nextPosition || getDefaultControllerPosition(minimized);
     const { width, height } = measureController(minimized);
-    return clampControllerPosition(basePosition, width, height);
+    return clampPanelPosition(basePosition, width, height);
+  };
+
+  const measureActivity = (minimized: boolean) => {
+    const rect = activityRef.current?.getBoundingClientRect();
+    if (rect?.width && rect?.height) {
+      return { height: rect.height, width: rect.width };
+    }
+    return getEstimatedActivitySize(minimized);
+  };
+
+  const normalizeActivityPosition = (nextPosition: Position | null, minimized: boolean) => {
+    const basePosition = nextPosition || getDefaultActivityPosition(minimized);
+    const { width, height } = measureActivity(minimized);
+    return clampPanelPosition(basePosition, width, height);
   };
 
   const refreshFrame = async (force = false) => {
@@ -979,12 +1017,25 @@ export default function ZoPlaysPokemonPage() {
   const beginControllerDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (!controllerRef.current) return;
     const rect = controllerRef.current.getBoundingClientRect();
-    dragStateRef.current = {
+    controllerDragStateRef.current = {
       pointerId: event.pointerId,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
     };
     setDraggingController(true);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  };
+
+  const beginActivityDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!activityRef.current) return;
+    const rect = activityRef.current.getBoundingClientRect();
+    activityDragStateRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    setDraggingActivity(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
     event.preventDefault();
   };
@@ -1069,6 +1120,25 @@ export default function ZoPlaysPokemonPage() {
       setControllerPosition(getDefaultControllerPosition(minimized));
     }
 
+    const activityMinimizedStored = window.localStorage.getItem(ACTIVITY_MINIMIZED_STORAGE_KEY) === "true";
+    setActivityMinimized(activityMinimizedStored);
+
+    const storedActivityPosition = window.localStorage.getItem(ACTIVITY_POSITION_STORAGE_KEY);
+    if (storedActivityPosition) {
+      try {
+        const parsed = JSON.parse(storedActivityPosition) as Position;
+        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
+          setActivityPosition(parsed);
+        } else {
+          setActivityPosition(getDefaultActivityPosition(activityMinimizedStored));
+        }
+      } catch {
+        setActivityPosition(getDefaultActivityPosition(activityMinimizedStored));
+      }
+    } else {
+      setActivityPosition(getDefaultActivityPosition(activityMinimizedStored));
+    }
+
     setThemeReady(true);
   }, []);
 
@@ -1135,32 +1205,60 @@ export default function ZoPlaysPokemonPage() {
 
   useEffect(() => {
     if (!themeReady) return;
+    window.localStorage.setItem(ACTIVITY_MINIMIZED_STORAGE_KEY, activityMinimized ? "true" : "false");
+    const timer = window.setTimeout(() => {
+      setActivityPosition((current) => normalizeActivityPosition(current, activityMinimized));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activityMinimized, themeReady]);
+
+  useEffect(() => {
+    if (!themeReady || !activityPosition) return;
+    window.localStorage.setItem(ACTIVITY_POSITION_STORAGE_KEY, JSON.stringify(activityPosition));
+  }, [activityPosition, themeReady]);
+
+  useEffect(() => {
+    if (!themeReady) return;
 
     const onResize = () => {
       setControllerPosition((current) => normalizeControllerPosition(current, controllerMinimized));
+      setActivityPosition((current) => normalizeActivityPosition(current, activityMinimized));
     };
 
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [controllerMinimized, themeReady]);
+  }, [activityMinimized, controllerMinimized, themeReady]);
 
   useEffect(() => {
     const onPointerMove = (event: PointerEvent) => {
-      const dragState = dragStateRef.current;
-      if (!dragState) return;
-      if (dragState.pointerId !== event.pointerId) return;
+      const controllerDragState = controllerDragStateRef.current;
+      if (controllerDragState?.pointerId === event.pointerId) {
+        const nextPosition = {
+          x: event.clientX - controllerDragState.offsetX,
+          y: event.clientY - controllerDragState.offsetY,
+        };
+        setControllerPosition(normalizeControllerPosition(nextPosition, controllerMinimized));
+      }
 
-      const nextPosition = {
-        x: event.clientX - dragState.offsetX,
-        y: event.clientY - dragState.offsetY,
-      };
-      setControllerPosition(normalizeControllerPosition(nextPosition, controllerMinimized));
+      const activityDragState = activityDragStateRef.current;
+      if (activityDragState?.pointerId === event.pointerId) {
+        const nextPosition = {
+          x: event.clientX - activityDragState.offsetX,
+          y: event.clientY - activityDragState.offsetY,
+        };
+        setActivityPosition(normalizeActivityPosition(nextPosition, activityMinimized));
+      }
     };
 
     const onPointerEnd = (event: PointerEvent) => {
-      if (dragStateRef.current?.pointerId !== event.pointerId) return;
-      dragStateRef.current = null;
-      setDraggingController(false);
+      if (controllerDragStateRef.current?.pointerId === event.pointerId) {
+        controllerDragStateRef.current = null;
+        setDraggingController(false);
+      }
+      if (activityDragStateRef.current?.pointerId === event.pointerId) {
+        activityDragStateRef.current = null;
+        setDraggingActivity(false);
+      }
     };
 
     window.addEventListener("pointermove", onPointerMove);
@@ -1171,7 +1269,7 @@ export default function ZoPlaysPokemonPage() {
       window.removeEventListener("pointerup", onPointerEnd);
       window.removeEventListener("pointercancel", onPointerEnd);
     };
-  }, [controllerMinimized]);
+  }, [activityMinimized, controllerMinimized]);
 
   useEffect(() => {
     if (!error) return;
@@ -1318,103 +1416,6 @@ export default function ZoPlaysPokemonPage() {
                   </span>
                 ) : null}
               </div>
-            </div>
-          </div>
-
-          <div
-            className="mt-5 rounded-[24px] border border-black/10 px-4 py-4"
-            style={{ background: "var(--shell-primary)" }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="zp-font-mono text-[11px]" style={{ color: "var(--text-strong)" }}>
-                  CONTROLLER
-                </h2>
-                <p className="mt-2 text-[16px] leading-4" style={{ color: "var(--text-soft)" }}>
-                  The controller now floats above the page. Drag it where you want, minimize it when it gets in the way, and keep a retail shell you like.
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <button
-                  type="button"
-                  onClick={randomizeTheme}
-                  className="rounded-full px-4 py-2 transition"
-                  style={{
-                    background: "var(--shell-warm)",
-                    color: "var(--text-strong)",
-                    boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.18)",
-                  }}
-                >
-                  <span className="zp-font-mono text-[10px]">RANDOMIZE</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setControllerMinimized((current) => !current)}
-                  className="rounded-full px-4 py-2 transition"
-                  style={{
-                    background: "var(--chip)",
-                    color: "var(--text-strong)",
-                    boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.15)",
-                  }}
-                >
-                  <span className="zp-font-mono text-[10px]">{controllerMinimized ? "OPEN PAD" : "MINIMIZE PAD"}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="mt-5 rounded-[24px] border border-black/10 px-4 py-4"
-            style={{ background: "var(--shell-primary)" }}
-          >
-            <p className="mt-2 text-[15px] leading-4" style={{ color: "var(--text-soft)" }}>
-              Last state update: {new Date(updatedAt).toLocaleTimeString()} · input {inputVersion}
-            </p>
-            <div className="mt-4 rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-              <label className="block">
-                <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                  YOUR NAME IN ROOM {room.toUpperCase()}
-                </span>
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(event) => setPlayerName(event.target.value.slice(0, 24))}
-                  placeholder="guest"
-                  className="mt-3 w-full rounded-[14px] border px-3 py-3 text-[17px] outline-none"
-                  style={{
-                    borderColor: "rgba(0,0,0,0.1)",
-                    background: "rgba(255,255,255,0.6)",
-                    color: "var(--text-strong)",
-                  }}
-                />
-              </label>
-              <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
-                Saved in this browser for this room only.
-              </p>
-            </div>
-            <div className="mt-4 max-h-64 space-y-2 overflow-auto">
-              {events.length === 0 ? (
-                <p className="text-[18px]" style={{ color: "var(--text-muted)" }}>
-                  No recent input yet.
-                </p>
-              ) : (
-                events.map((event, index) => {
-                  const button = BUTTON_LOOKUP[event.button];
-                  return (
-                    <div
-                      key={`${event.timestamp}-${index}`}
-                      className="flex items-center justify-between gap-3 rounded-[14px] px-3 py-2 text-[15px] leading-4"
-                      style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
-                    >
-                      <span>
-                        <span className="zp-font-mono mr-2 text-[9px]">{button?.label || event.button}</span>
-                        {describeEvent(event)} by {event.user}
-                      </span>
-                      <span style={{ color: "var(--text-muted)" }}>{new Date(event.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                  );
-                })
-              )}
             </div>
           </div>
         </div>
@@ -1668,7 +1669,7 @@ export default function ZoPlaysPokemonPage() {
 
                       <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
                         <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          DECK POSITION
+                          CONTROLLER POSITION
                         </div>
                         <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
                           Keep the controller out of the screen area.
@@ -1689,6 +1690,61 @@ export default function ZoPlaysPokemonPage() {
                             style={{ background: "var(--chip)", color: "var(--text-strong)" }}
                           >
                             <span className="zp-font-mono text-[9px]">MINIMIZE</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          ROOM NICKNAME
+                        </div>
+                        <label className="mt-3 block">
+                          <span className="text-[16px]" style={{ color: "var(--text-strong)" }}>
+                            Visible in room {room}.
+                          </span>
+                          <input
+                            type="text"
+                            value={playerName}
+                            onChange={(event) => setPlayerName(event.target.value.slice(0, 24))}
+                            placeholder="guest"
+                            className="mt-3 w-full rounded-[14px] border px-3 py-3 text-[17px] outline-none"
+                            style={{
+                              borderColor: "rgba(0,0,0,0.1)",
+                              background: "rgba(255,255,255,0.6)",
+                              color: "var(--text-strong)",
+                            }}
+                          />
+                        </label>
+                        <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
+                          Saved in this browser for this room only.
+                        </p>
+                      </div>
+
+                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          LIVE ACTIVITY WINDOW
+                        </div>
+                        <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                          Move or hide the activity feed separately from the controller.
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
+                            className="rounded-full px-3 py-2 transition"
+                            style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                          >
+                            <span className="zp-font-mono text-[9px]">RESET WINDOW</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActivityMinimized((current) => !current)}
+                            className="rounded-full px-3 py-2 transition"
+                            style={{ background: "var(--chip)", color: "var(--text-strong)" }}
+                          >
+                            <span className="zp-font-mono text-[9px]">{activityMinimized ? "OPEN" : "MINIMIZE"}</span>
                           </button>
                         </div>
                       </div>
@@ -1823,6 +1879,134 @@ export default function ZoPlaysPokemonPage() {
                     </div>
                   </div>
                 ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {activityPosition ? (
+          <div
+            ref={activityRef}
+            className="fixed z-30"
+            style={{
+              left: activityPosition.x,
+              top: activityPosition.y,
+              maxWidth: "calc(100vw - 24px)",
+              width: activityMinimized ? "250px" : "352px",
+            }}
+          >
+            {activityMinimized ? (
+              <div
+                className="flex items-center gap-2 rounded-[22px] border border-black/10 px-3 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.24)]"
+                style={{ background: "var(--shell-primary)" }}
+              >
+                <button
+                  type="button"
+                  onPointerDown={beginActivityDrag}
+                  className="rounded-full px-3 py-2 transition"
+                  style={{
+                    touchAction: "none",
+                    cursor: draggingActivity ? "grabbing" : "grab",
+                    background: "var(--chip)",
+                    color: "var(--text-strong)",
+                  }}
+                >
+                  <span className="zp-font-mono text-[9px]">MOVE</span>
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                    LIVE ACTIVITY
+                  </div>
+                  <div className="truncate text-[15px]" style={{ color: "var(--text-strong)" }}>
+                    Input {inputVersion} · {events.length} events
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActivityMinimized(false)}
+                  className="rounded-full px-3 py-2 transition"
+                  style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                >
+                  <span className="zp-font-mono text-[9px]">OPEN</span>
+                </button>
+              </div>
+            ) : (
+              <div
+                className="rounded-[26px] border border-black/10 px-4 py-4 shadow-[0_20px_40px_rgba(0,0,0,0.28)]"
+                style={{ background: "var(--shell-primary)" }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      onPointerDown={beginActivityDrag}
+                      className="rounded-full px-3 py-2 transition"
+                      style={{
+                        touchAction: "none",
+                        cursor: draggingActivity ? "grabbing" : "grab",
+                        background: "var(--chip)",
+                        color: "var(--text-strong)",
+                      }}
+                    >
+                      <span className="zp-font-mono text-[9px]">MOVE</span>
+                    </button>
+                    <div>
+                      <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
+                        LIVE ACTIVITY
+                      </div>
+                      <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+                        Watch the room log in its own movable window.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
+                      className="rounded-full px-3 py-2 transition"
+                      style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
+                    >
+                      <span className="zp-font-mono text-[9px]">RESET</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActivityMinimized(true)}
+                      className="rounded-full px-3 py-2 transition"
+                      style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                    >
+                      <span className="zp-font-mono text-[9px]">MIN</span>
+                    </button>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-[15px] leading-4" style={{ color: "var(--text-soft)" }}>
+                  Last state update: {new Date(updatedAt).toLocaleTimeString()} · input {inputVersion}
+                </p>
+
+                <div className="mt-4 max-h-72 space-y-2 overflow-auto">
+                  {events.length === 0 ? (
+                    <p className="text-[18px]" style={{ color: "var(--text-muted)" }}>
+                      No recent input yet.
+                    </p>
+                  ) : (
+                    events.map((event, index) => {
+                      const button = BUTTON_LOOKUP[event.button];
+                      return (
+                        <div
+                          key={`${event.timestamp}-${index}`}
+                          className="flex items-center justify-between gap-3 rounded-[14px] px-3 py-2 text-[15px] leading-4"
+                          style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
+                        >
+                          <span>
+                            <span className="zp-font-mono mr-2 text-[9px]">{button?.label || event.button}</span>
+                            {describeEvent(event)} by {event.user}
+                          </span>
+                          <span style={{ color: "var(--text-muted)" }}>{new Date(event.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>
