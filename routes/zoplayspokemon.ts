@@ -763,6 +763,7 @@ export default function ZoPlaysPokemonPage() {
   const [activityPosition, setActivityPosition] = useState<Position | null>(null);
   const [panelTab, setPanelTab] = useState<ControlPanelTab>("play");
   const [playerName, setPlayerName] = useState("guest");
+  const [heldDpadCode, setHeldDpadCode] = useState<string | null>(null);
   const [draggingController, setDraggingController] = useState(false);
   const [draggingActivity, setDraggingActivity] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -785,6 +786,7 @@ export default function ZoPlaysPokemonPage() {
   const activityRef = useRef<HTMLDivElement | null>(null);
   const controllerDragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const activityDragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
+  const dpadPointerRef = useRef<{ pointerId: number; code: string | null } | null>(null);
 
   const currentTheme = THEME_LOOKUP[themeId] || THEME_PRESETS[0];
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
@@ -1017,6 +1019,69 @@ export default function ZoPlaysPokemonPage() {
     tap(code);
   };
 
+  const pickDpadCodeFromPointer = (event: ReactPointerEvent, rect: DOMRect): string | null => {
+    const x = event.clientX;
+    const y = event.clientY;
+    const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    if (!inside) return null;
+
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = x - cx;
+    const dy = y - cy;
+    const deadzone = Math.min(rect.width, rect.height) * 0.16;
+    if (Math.hypot(dx, dy) < deadzone) return null;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      return dx > 0 ? "0" : "1";
+    }
+    return dy > 0 ? "3" : "2";
+  };
+
+  const holdDpad = async (nextCode: string | null) => {
+    if (controlsDisabled) return;
+    const currentCode = dpadPointerRef.current?.code ?? null;
+    if (currentCode === nextCode) return;
+
+    setError("");
+
+    if (currentCode) {
+      await sendInput(currentCode, "release");
+    }
+    dpadPointerRef.current = dpadPointerRef.current ? { ...dpadPointerRef.current, code: nextCode } : { pointerId: -1, code: nextCode };
+    setHeldDpadCode(nextCode);
+    if (nextCode) {
+      await sendInput(nextCode, "press");
+    }
+  };
+
+  const beginDpadPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (controlsDisabled) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const code = pickDpadCodeFromPointer(event, rect);
+    dpadPointerRef.current = { pointerId: event.pointerId, code: null };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    void holdDpad(code);
+  };
+
+  const moveDpadPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = dpadPointerRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const code = pickDpadCodeFromPointer(event, rect);
+    event.preventDefault();
+    void holdDpad(code);
+  };
+
+  const endDpadPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = dpadPointerRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    dpadPointerRef.current = null;
+    event.preventDefault();
+    void holdDpad(null);
+  };
+
   const pressMenuButton = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     tap(code);
@@ -1216,6 +1281,14 @@ export default function ZoPlaysPokemonPage() {
   }, [playerName, room]);
 
   useEffect(() => {
+    if (!heldDpadCode) return;
+    if (!controlsDisabled) return;
+    dpadPointerRef.current = null;
+    setHeldDpadCode(null);
+    void sendInput(heldDpadCode, "release");
+  }, [controlsDisabled, heldDpadCode]);
+
+  useEffect(() => {
     if (!themeReady) return;
     window.localStorage.setItem(CONTROLLER_MINIMIZED_STORAGE_KEY, controllerMinimized ? "true" : "false");
     const timer = window.setTimeout(() => {
@@ -1332,6 +1405,11 @@ export default function ZoPlaysPokemonPage() {
 
   useEffect(() => {
     burstPollIdRef.current += 1;
+    if (heldDpadCode) {
+      dpadPointerRef.current = null;
+      setHeldDpadCode(null);
+      void sendInput(heldDpadCode, "release");
+    }
     frameVersionRef.current = 0;
     inputVersionRef.current = 0;
     lastFrameAtRef.current = 0;
@@ -1372,6 +1450,7 @@ export default function ZoPlaysPokemonPage() {
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
   const showFrameLoadingOverlay = frameLoading && (!frameSrc || visibleQueueCount > 0);
+  const dpadActiveCode = heldDpadCode || pendingTapCode;
 
   const renderControllerContent = (isMobileView: boolean) => (
     <div
@@ -1470,34 +1549,42 @@ export default function ZoPlaysPokemonPage() {
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-4">
-            <div className="grid grid-cols-3 gap-2 rounded-[22px] p-3" style={{ background: "var(--shell-secondary)" }}>
+            <div
+              className="grid grid-cols-3 gap-2 rounded-[22px] p-3"
+              style={{ background: "var(--shell-secondary)", touchAction: "none" }}
+              onPointerDown={beginDpadPointer}
+              onPointerMove={moveDpadPointer}
+              onPointerUp={endDpadPointer}
+              onPointerCancel={endDpadPointer}
+              onContextMenu={(event) => event.preventDefault()}
+            >
               <div />
               <DpadButton
                 label="UP"
-                active={pendingTapCode === "2"}
+                active={dpadActiveCode === "2"}
                 disabled={controlsDisabled}
-                onPress={beginPointerPress("2")}
+                onPress={(event) => event.preventDefault()}
               />
               <div />
               <DpadButton
                 label="LEFT"
-                active={pendingTapCode === "1"}
+                active={dpadActiveCode === "1"}
                 disabled={controlsDisabled}
-                onPress={beginPointerPress("1")}
+                onPress={(event) => event.preventDefault()}
               />
               <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
               <DpadButton
                 label="RIGHT"
-                active={pendingTapCode === "0"}
+                active={dpadActiveCode === "0"}
                 disabled={controlsDisabled}
-                onPress={beginPointerPress("0")}
+                onPress={(event) => event.preventDefault()}
               />
               <div />
               <DpadButton
                 label="DOWN"
-                active={pendingTapCode === "3"}
+                active={dpadActiveCode === "3"}
                 disabled={controlsDisabled}
-                onPress={beginPointerPress("3")}
+                onPress={(event) => event.preventDefault()}
               />
               <div />
             </div>
