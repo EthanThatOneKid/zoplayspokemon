@@ -1471,36 +1471,30 @@ export default function ZoPlaysPokemonPage() {
                 className="rounded-[26px] border border-black/10 px-4 py-4 shadow-[0_20px_40px_rgba(0,0,0,0.28)]"
                 style={{ background: "var(--shell-primary)" }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2">
-                    <button
-                      type="button"
-                      onPointerDown={beginControllerDrag}
-                      className="rounded-full px-3 py-2 transition"
-                      style={{
-                        touchAction: "none",
-                        cursor: isDraggingController ? "grabbing" : "grab",
-                        background: "var(--chip)",
-                        color: "var(--text-strong)",
-                      }}
-                    >
-                      <span className="zp-font-mono text-[9px]">MOVE</span>
-                    </button>
-                    <div>
-                      <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                        CONTROLLER
-                      </div>
-                      <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-                        {panelTab === "play"
-                          ? "Drag the deck wherever it fits your screen."
-                          : "Settings and docs pause button input until you return to Play."}
-                      </p>
+                <div
+                  className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
+                  onPointerDown={beginControllerDrag}
+                  style={{
+                    touchAction: "none",
+                    cursor: isDraggingController ? "grabbing" : "grab",
+                    background: "var(--chip-soft)",
+                  }}
+                >
+                  <div>
+                    <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
+                      CONTROLLER
                     </div>
+                    <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+                      {panelTab === "play"
+                        ? "Drag the deck wherever it fits your screen."
+                        : "Settings and docs pause button input until you return to Play."}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={resetControllerPosition}
+                      onPointerDown={(event) => event.stopPropagation()}
                       className="rounded-full px-3 py-2 transition"
                       style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
                     >
@@ -1509,6 +1503,7 @@ export default function ZoPlaysPokemonPage() {
                     <button
                       type="button"
                       onClick={() => setControllerMinimized(true)}
+                      onPointerDown={(event) => event.stopPropagation()}
                       className="rounded-full px-3 py-2 transition"
                       style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
                     >
@@ -1935,34 +1930,28 @@ export default function ZoPlaysPokemonPage() {
                 className="rounded-[26px] border border-black/10 px-4 py-4 shadow-[0_20px_40px_rgba(0,0,0,0.28)]"
                 style={{ background: "var(--shell-primary)" }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2">
-                    <button
-                      type="button"
-                      onPointerDown={beginActivityDrag}
-                      className="rounded-full px-3 py-2 transition"
-                      style={{
-                        touchAction: "none",
-                        cursor: draggingActivity ? "grabbing" : "grab",
-                        background: "var(--chip)",
-                        color: "var(--text-strong)",
-                      }}
-                    >
-                      <span className="zp-font-mono text-[9px]">MOVE</span>
-                    </button>
-                    <div>
-                      <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                        LIVE ACTIVITY
-                      </div>
-                      <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-                        Watch the room log in its own movable window.
-                      </p>
+                <div
+                  className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
+                  onPointerDown={beginActivityDrag}
+                  style={{
+                    touchAction: "none",
+                    cursor: draggingActivity ? "grabbing" : "grab",
+                    background: "var(--chip-soft)",
+                  }}
+                >
+                  <div>
+                    <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
+                      LIVE ACTIVITY
                     </div>
+                    <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+                      Watch the room log in its own movable window.
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
+                      onPointerDown={(event) => event.stopPropagation()}
                       className="rounded-full px-3 py-2 transition"
                       style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
                     >
@@ -1971,6 +1960,7 @@ export default function ZoPlaysPokemonPage() {
                     <button
                       type="button"
                       onClick={() => setActivityMinimized(true)}
+                      onPointerDown={(event) => event.stopPropagation()}
                       className="rounded-full px-3 py-2 transition"
                       style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
                     >
