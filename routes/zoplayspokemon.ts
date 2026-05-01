@@ -1458,47 +1458,52 @@ export default function ZoPlaysPokemonPage() {
       style={{ background: "var(--shell-primary)" }}
     >
       <div
-        className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
+        className="flex items-center justify-between gap-3 border-b border-black/10 px-4"
         onPointerDown={isMobileView ? undefined : beginControllerDrag}
         style={{
           touchAction: "none",
-          cursor: isMobileView ? "default" : (isDraggingController ? "grabbing" : "grab"),
-          background: "var(--chip-soft)",
+          cursor: isMobileView ? "default" : isDraggingController ? "grabbing" : "grab",
+          background: "var(--shell-warm)",
+          height: "2em",
+          marginLeft: "-1rem",
+          marginRight: "-1rem",
+          marginTop: "-1rem",
+          borderTopLeftRadius: "22px",
+          borderTopRightRadius: "22px",
         }}
       >
-        <div>
-          <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-            CONTROLLER
-          </div>
-          <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-            {panelTab === "play"
-              ? isMobileView ? "Enjoy customized controls designed for touch." : "Drag the deck wherever it fits your screen."
-              : "Settings and docs pause button input until you return to Play."}
-          </p>
+        <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-strong)" }}>
+          CONTROLLER
         </div>
         {!isMobileView && (
           <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={resetControllerPosition}
-              onPointerDown={(event) => event.stopPropagation()}
-              className="rounded-full px-3 py-2 transition"
-              style={{ background: "var(--chip)", color: "var(--text-strong)" }}
-            >
-              <span className="zp-font-mono text-[9px]">RESET</span>
-            </button>
-            <button
+              aria-label="Minimize controller"
               type="button"
               onClick={() => setControllerMinimized(true)}
               onPointerDown={(event) => event.stopPropagation()}
-              className="rounded-full px-3 py-2 transition"
-              style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+              className="grid h-7 w-9 place-items-center rounded-[10px] border border-black/10 transition"
+              style={{
+                background: "color-mix(in srgb, var(--shell-warm) 72%, white)",
+                color: "var(--text-strong)",
+                boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
+              }}
             >
-              <span className="zp-font-mono text-[9px]">MIN</span>
+              <span className="zp-font-mono text-[12px] leading-none" aria-hidden="true">
+                –
+              </span>
             </button>
           </div>
         )}
       </div>
+
+      <p className="mt-3 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+        {panelTab === "play"
+          ? isMobileView
+            ? "Enjoy customized controls designed for touch."
+            : "Drag the deck wherever it fits your screen."
+          : "Settings and docs pause button input until you return to Play."}
+      </p>
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="rounded-full px-3 py-1 text-[14px] leading-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
@@ -1826,7 +1831,7 @@ export default function ZoPlaysPokemonPage() {
                 ROOM MODEL
               </div>
               <p className="mt-2" style={{ color: "var(--text-strong)" }}>
-                The room model exists to document how isolated shared sessions were handled in the live system. Public copy should describe that architecture without treating it as a replication guide.
+                Rooms isolate shared sessions so each group can have its own state, inputs, and frame timeline.
               </p>
             </div>
             <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
@@ -1869,7 +1874,7 @@ export default function ZoPlaysPokemonPage() {
               <span className="zp-font-mono text-[9px]">OPEN GITHUB REPO</span>
             </a>
             <p className="mt-3" style={{ color: "var(--text-muted)" }}>
-              Mirror repo for the live Zo Space routes and emulator service source, kept as evidence and analysis rather than a starter kit.
+              Mirror repo for the live Zo Space routes and emulator service source.
             </p>
           </div>
         </div>
@@ -1883,45 +1888,48 @@ export default function ZoPlaysPokemonPage() {
       style={{ background: "var(--shell-primary)" }}
     >
       <div
-        className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
+        className="flex items-center justify-between gap-3 border-b border-black/10 px-4"
         onPointerDown={isMobileView ? undefined : beginActivityDrag}
         style={{
           touchAction: "none",
           cursor: isMobileView ? "default" : (draggingActivity ? "grabbing" : "grab"),
-          background: "var(--chip-soft)",
+          background: "var(--shell-warm)",
+          height: "2em",
+          marginLeft: "-1rem",
+          marginRight: "-1rem",
+          marginTop: "-1rem",
+          borderTopLeftRadius: "22px",
+          borderTopRightRadius: "22px",
         }}
       >
-        <div>
-          <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-            LIVE ACTIVITY
-          </div>
-          <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-            Watch the room log in its own window.
-          </p>
+        <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-strong)" }}>
+          LIVE ACTIVITY
         </div>
         {!isMobileView && (
           <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
-              onPointerDown={(event) => event.stopPropagation()}
-              className="rounded-full px-3 py-2 transition"
-              style={{ background: "var(--chip)", color: "var(--text-strong)" }}
-            >
-              <span className="zp-font-mono text-[9px]">RESET</span>
-            </button>
-            <button
+              aria-label="Minimize activity"
               type="button"
               onClick={() => setActivityMinimized(true)}
               onPointerDown={(event) => event.stopPropagation()}
-              className="rounded-full px-3 py-2 transition"
-              style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+              className="grid h-7 w-9 place-items-center rounded-[10px] border border-black/10 transition"
+              style={{
+                background: "color-mix(in srgb, var(--shell-warm) 72%, white)",
+                color: "var(--text-strong)",
+                boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
+              }}
             >
-              <span className="zp-font-mono text-[9px]">MIN</span>
+              <span className="zp-font-mono text-[12px] leading-none" aria-hidden="true">
+                –
+              </span>
             </button>
           </div>
         )}
       </div>
+
+      <p className="mt-3 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+        Watch the room log in its own window.
+      </p>
 
       <p className="mt-4 text-[15px] leading-4" style={{ color: "var(--text-soft)" }}>
         Last state update: {new Date(updatedAt).toLocaleTimeString()} · input {inputVersion}
