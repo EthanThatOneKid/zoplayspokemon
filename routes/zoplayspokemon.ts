@@ -764,6 +764,8 @@ export default function ZoPlaysPokemonPage() {
   const [playerName, setPlayerName] = useState("guest");
   const [draggingController, setDraggingController] = useState(false);
   const [draggingActivity, setDraggingActivity] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
   const frameHashRef = useRef("");
   const frameVersionRef = useRef(0);
   const inputVersionRef = useRef(0);
@@ -1015,7 +1017,7 @@ export default function ZoPlaysPokemonPage() {
   };
 
   const beginControllerDrag = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!controllerRef.current) return;
+    if (!controllerRef.current || isMobile) return;
     const rect = controllerRef.current.getBoundingClientRect();
     controllerDragStateRef.current = {
       pointerId: event.pointerId,
@@ -1028,7 +1030,7 @@ export default function ZoPlaysPokemonPage() {
   };
 
   const beginActivityDrag = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!activityRef.current) return;
+    if (!activityRef.current || isMobile) return;
     const rect = activityRef.current.getBoundingClientRect();
     activityDragStateRef.current = {
       pointerId: event.pointerId,
@@ -1084,6 +1086,15 @@ export default function ZoPlaysPokemonPage() {
   const resetControllerPosition = () => {
     setControllerPosition(normalizeControllerPosition(getDefaultControllerPosition(controllerMinimized), controllerMinimized));
   };
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     frameLoadingRef.current = frameLoading;
@@ -1231,6 +1242,7 @@ export default function ZoPlaysPokemonPage() {
 
   useEffect(() => {
     const onPointerMove = (event: PointerEvent) => {
+      if (isMobile) return;
       const controllerDragState = controllerDragStateRef.current;
       if (controllerDragState?.pointerId === event.pointerId) {
         const nextPosition = {
@@ -1269,7 +1281,7 @@ export default function ZoPlaysPokemonPage() {
       window.removeEventListener("pointerup", onPointerEnd);
       window.removeEventListener("pointercancel", onPointerEnd);
     };
-  }, [activityMinimized, controllerMinimized]);
+  }, [activityMinimized, controllerMinimized, isMobile]);
 
   useEffect(() => {
     if (!error) return;
@@ -1339,6 +1351,500 @@ export default function ZoPlaysPokemonPage() {
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
   const showFrameLoadingOverlay = frameLoading && (!frameSrc || visibleQueueCount > 0);
+
+  const renderControllerContent = (isMobileView: boolean) => (
+    <div
+      className="rounded-[26px] border border-black/10 px-4 py-4 shadow-[0_20px_40px_rgba(0,0,0,0.28)]"
+      style={{ background: "var(--shell-primary)" }}
+    >
+      <div
+        className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
+        onPointerDown={isMobileView ? undefined : beginControllerDrag}
+        style={{
+          touchAction: "none",
+          cursor: isMobileView ? "default" : (isDraggingController ? "grabbing" : "grab"),
+          background: "var(--chip-soft)",
+        }}
+      >
+        <div>
+          <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
+            CONTROLLER
+          </div>
+          <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+            {panelTab === "play"
+              ? isMobileView ? "Enjoy customized controls designed for touch." : "Drag the deck wherever it fits your screen."
+              : "Settings and docs pause button input until you return to Play."}
+          </p>
+        </div>
+        {!isMobileView && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={resetControllerPosition}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="rounded-full px-3 py-2 transition"
+              style={{ background: "var(--chip)", color: "var(--text-strong)" }}
+            >
+              <span className="zp-font-mono text-[9px]">RESET</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setControllerMinimized(true)}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="rounded-full px-3 py-2 transition"
+              style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+            >
+              <span className="zp-font-mono text-[9px]">MIN</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="rounded-full px-3 py-1 text-[14px] leading-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+          {currentTheme.name} · {room}
+        </div>
+        <div className="flex items-center gap-2">
+          {(["play", "settings", "about"] as ControlPanelTab[]).map((tab) => {
+            const active = panelTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setPanelTab(tab)}
+                className="rounded-full px-3 py-2 transition"
+                style={{
+                  background: active ? "var(--shell-warm)" : "var(--chip-soft)",
+                  color: "var(--text-strong)",
+                  boxShadow: active
+                    ? "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14)"
+                    : "inset 2px 2px 0 rgba(255,255,255,0.22), inset -2px -2px 0 rgba(0,0,0,0.08)",
+                }}
+              >
+                <span className="zp-font-mono text-[9px]">{tab.toUpperCase()}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {panelTab === "play" ? (
+        <>
+          <div className="mt-4 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => tap("7")}
+              disabled={controlsDisabled}
+              className="rounded-full px-4 py-2 transition disabled:cursor-wait disabled:opacity-70"
+              style={{
+                background: "var(--shell-warm)",
+                color: "var(--text-strong)",
+                boxShadow: controlsDisabled
+                  ? "inset 2px 2px 0 rgba(0,0,0,0.12)"
+                  : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.18)",
+              }}
+            >
+              <span className="zp-font-mono text-[10px]">SEND START INPUT</span>
+            </button>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-4">
+            <div className="grid grid-cols-3 gap-2 rounded-[22px] p-3" style={{ background: "var(--shell-secondary)" }}>
+              <div />
+              <DpadButton
+                label="UP"
+                active={pendingTapCode === "2"}
+                disabled={controlsDisabled}
+                onPress={beginPointerPress("2")}
+              />
+              <div />
+              <DpadButton
+                label="LEFT"
+                active={pendingTapCode === "1"}
+                disabled={controlsDisabled}
+                onPress={beginPointerPress("1")}
+              />
+              <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
+              <DpadButton
+                label="RIGHT"
+                active={pendingTapCode === "0"}
+                disabled={controlsDisabled}
+                onPress={beginPointerPress("0")}
+              />
+              <div />
+              <DpadButton
+                label="DOWN"
+                active={pendingTapCode === "3"}
+                disabled={controlsDisabled}
+                onPress={beginPointerPress("3")}
+              />
+              <div />
+            </div>
+
+            <div className="flex -rotate-12 flex-col items-center gap-4">
+              {actionButtons.map((button) => (
+                <ActionButton
+                  key={button.code}
+                  button={button}
+                  active={pendingTapCode === button.code}
+                  disabled={controlsDisabled}
+                  onPress={beginPointerPress(button.code)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-center gap-4">
+            {menuButtons.map((button) => (
+              <MenuButton
+                key={button.code}
+                label={button.label}
+                active={pendingTapCode === button.code}
+                disabled={controlsDisabled}
+                onClick={pressMenuButton(button.code)}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-2 text-[14px] leading-4 sm:grid-cols-2" style={{ color: "var(--text-soft)" }}>
+            {BUTTONS.map((button) => (
+              <div key={button.code} className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)" }}>
+                <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>
+                  {button.label}
+                </span>
+                <span className="ml-2">{button.hint}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {panelTab === "settings" ? (
+        <div className="mt-5 space-y-3 text-[15px] leading-4">
+          <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+            Button inputs are paused while you change controller settings.
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              aria-pressed={keyboardEnabled}
+              onClick={() => setKeyboardEnabled((current) => !current)}
+              className="rounded-[18px] px-4 py-4 text-left transition"
+              style={{
+                background: keyboardEnabled ? "var(--chip-alt)" : "var(--chip-soft)",
+                boxShadow: keyboardEnabled
+                  ? "inset 2px 2px 0 rgba(255,255,255,0.45), inset -2px -2px 0 rgba(140,48,40,0.22)"
+                  : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
+              }}
+              title="Opt in if you want keyboard controls."
+            >
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                KEYBOARD: {keyboardEnabled ? "ON" : "OFF"}
+              </div>
+              <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                {keyboardEnabled ? "Keyboard play is armed." : "Keyboard play is blocked."}
+              </div>
+              <div className="mt-2" style={{ color: "var(--text-muted)" }}>
+                Opt in to avoid accidental inputs while browsing.
+              </div>
+            </button>
+
+            <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                CONTROLLER POSITION
+              </div>
+              <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                Keep the controller out of the screen area.
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={resetControllerPosition}
+                  className="rounded-full px-3 py-2 transition"
+                  style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                >
+                  <span className="zp-font-mono text-[9px]">RESET POSITION</span>
+                </button>
+                {!isMobileView && (
+                  <button
+                    type="button"
+                    onClick={() => setControllerMinimized(true)}
+                    className="rounded-full px-3 py-2 transition"
+                    style={{ background: "var(--chip)", color: "var(--text-strong)" }}
+                  >
+                    <span className="zp-font-mono text-[9px]">MINIMIZE</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                ROOM NICKNAME
+              </div>
+              <label className="mt-3 block">
+                <span className="text-[16px]" style={{ color: "var(--text-strong)" }}>
+                  Visible in room {room}.
+                </span>
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(event) => setPlayerName(event.target.value.slice(0, 24))}
+                  placeholder="guest"
+                  className="mt-3 w-full rounded-[14px] border px-3 py-3 text-[17px] outline-none"
+                  style={{
+                    borderColor: "rgba(0,0,0,0.1)",
+                    background: "rgba(255,255,255,0.6)",
+                    color: "var(--text-strong)",
+                  }}
+                />
+              </label>
+              <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
+                Saved in this browser for this room only.
+              </p>
+            </div>
+
+            <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                LIVE ACTIVITY WINDOW
+              </div>
+              <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                Move or hide the activity feed separately from the controller.
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {!isMobileView && (
+                  <button
+                    type="button"
+                    onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
+                    className="rounded-full px-3 py-2 transition"
+                    style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                  >
+                    <span className="zp-font-mono text-[9px]">RESET WINDOW</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActivityMinimized((current) => !current)}
+                  className="rounded-full px-3 py-2 transition"
+                  style={{ background: "var(--chip)", color: "var(--text-strong)" }}
+                >
+                  <span className="zp-font-mono text-[9px]">{activityMinimized ? "OPEN" : "MINIMIZE"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                  THEME
+                </div>
+                <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                  {currentTheme.name}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={randomizeTheme}
+                className="rounded-full px-3 py-2 transition"
+                style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+              >
+                <span className="zp-font-mono text-[9px]">RANDOMIZE</span>
+              </button>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {THEME_PRESETS.map((theme) => {
+                const selected = theme.id === themeId;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => setThemeId(theme.id)}
+                    className="rounded-[16px] border px-3 py-3 text-left transition"
+                    style={{
+                      borderColor: selected ? "var(--text-strong)" : "rgba(0,0,0,0.08)",
+                      background: selected ? "var(--panel-soft)" : "rgba(255,255,255,0.18)",
+                      boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.08) inset" : "none",
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                          {selected ? "ACTIVE" : "RETAIL"}
+                        </div>
+                        <div className="mt-2 text-[16px]" style={{ color: "var(--text-strong)" }}>
+                          {theme.name}
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        {theme.swatches.map((swatch) => (
+                          <span
+                            key={swatch}
+                            className="zp-swatch block h-4 w-4 rounded-full"
+                            style={{ background: swatch }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
+                      {theme.note}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {panelTab === "about" ? (
+        <div className="mt-5 space-y-3 text-[15px] leading-4">
+          <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+              ABOUT THIS ROOM
+            </div>
+            <p className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+              This route records a real shared Pokemon Crystal session and exposes the coordination model, frame timing, and interface behavior as a public case study.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                ROOM MODEL
+              </div>
+              <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                The room model exists to document how isolated shared sessions were handled in the live system. Public copy should describe that architecture without treating it as a replication guide.
+              </p>
+            </div>
+            <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                INPUT + FRAME SYNC
+              </div>
+              <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                The page long-polls room state, tracks frame versions and hashes, and refreshes the PNG only when a newer frame is ready.
+              </p>
+            </div>
+            <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                CUSTOMIZATION
+              </div>
+              <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                Theme presets, keyboard opt-in, and the floating draggable controller are all saved in your browser.
+              </p>
+            </div>
+            <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                BACKEND
+              </div>
+              <p className="mt-2" style={{ color: "var(--text-strong)" }}>
+                A hosted PyBoy service runs the emulator, while Zo Space serves the controller UI and API routes that proxy room state, input, and frames.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+              SOURCE
+            </div>
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex rounded-full px-4 py-2 transition"
+              style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+            >
+              <span className="zp-font-mono text-[9px]">OPEN GITHUB REPO</span>
+            </a>
+            <p className="mt-3" style={{ color: "var(--text-muted)" }}>
+              Mirror repo for the live Zo Space routes and emulator service source, kept as evidence and analysis rather than a starter kit.
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const renderActivityContent = (isMobileView: boolean) => (
+    <div
+      className="rounded-[26px] border border-black/10 px-4 py-4 shadow-[0_20px_40px_rgba(0,0,0,0.28)]"
+      style={{ background: "var(--shell-primary)" }}
+    >
+      <div
+        className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
+        onPointerDown={isMobileView ? undefined : beginActivityDrag}
+        style={{
+          touchAction: "none",
+          cursor: isMobileView ? "default" : (draggingActivity ? "grabbing" : "grab"),
+          background: "var(--chip-soft)",
+        }}
+      >
+        <div>
+          <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
+            LIVE ACTIVITY
+          </div>
+          <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+            Watch the room log in its own window.
+          </p>
+        </div>
+        {!isMobileView && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="rounded-full px-3 py-2 transition"
+              style={{ background: "var(--chip)", color: "var(--text-strong)" }}
+            >
+              <span className="zp-font-mono text-[9px]">RESET</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivityMinimized(true)}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="rounded-full px-3 py-2 transition"
+              style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+            >
+              <span className="zp-font-mono text-[9px]">MIN</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p className="mt-4 text-[15px] leading-4" style={{ color: "var(--text-soft)" }}>
+        Last state update: {new Date(updatedAt).toLocaleTimeString()} · input {inputVersion}
+      </p>
+
+      <div className="mt-4 max-h-72 space-y-2 overflow-auto">
+        {events.length === 0 ? (
+          <p className="text-[18px]" style={{ color: "var(--text-muted)" }}>
+            No recent input yet.
+          </p>
+        ) : (
+          events.map((event, index) => {
+            const button = BUTTON_LOOKUP[event.button];
+            return (
+              <div
+                key={`${event.timestamp}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-[14px] px-3 py-2 text-[15px] leading-4"
+                style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
+              >
+                <span>
+                  <span className="zp-font-mono mr-2 text-[9px]">{button?.label || event.button}</span>
+                  {describeEvent(event)} by {event.user}
+                </span>
+                <span style={{ color: "var(--text-muted)" }}>{new Date(event.timestamp).toLocaleTimeString()}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="zp-root min-h-screen" style={rootStyle}>
@@ -1420,7 +1926,42 @@ export default function ZoPlaysPokemonPage() {
           </div>
         </div>
 
-        {controllerPosition ? (
+        {isMobile && (
+          <div className="mt-6 flex flex-col gap-6">
+            <div ref={controllerRef}>
+              {renderControllerContent(true)}
+            </div>
+            <div ref={activityRef}>
+              {activityMinimized ? (
+                <div
+                  className="flex items-center gap-2 rounded-[22px] border border-black/10 px-3 py-3 shadow-[0_14px_30px_rgba(0,0,0,0.24)]"
+                  style={{ background: "var(--shell-primary)" }}
+                >
+                  <div className="min-w-0 flex-1 pl-2">
+                    <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                      LIVE ACTIVITY
+                    </div>
+                    <div className="truncate text-[15px]" style={{ color: "var(--text-strong)" }}>
+                      Input {inputVersion} · {events.length} events
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActivityMinimized(false)}
+                    className="rounded-full px-3 py-2 transition"
+                    style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
+                  >
+                    <span className="zp-font-mono text-[9px]">OPEN</span>
+                  </button>
+                </div>
+              ) : (
+                renderActivityContent(true)
+              )}
+            </div>
+          </div>
+        )}
+
+        {!isMobile && controllerPosition ? (
           <div
             ref={controllerRef}
             className="fixed z-40"
@@ -1467,419 +2008,12 @@ export default function ZoPlaysPokemonPage() {
                 </button>
               </div>
             ) : (
-              <div
-                className="rounded-[26px] border border-black/10 px-4 py-4 shadow-[0_20px_40px_rgba(0,0,0,0.28)]"
-                style={{ background: "var(--shell-primary)" }}
-              >
-                <div
-                  className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
-                  onPointerDown={beginControllerDrag}
-                  style={{
-                    touchAction: "none",
-                    cursor: isDraggingController ? "grabbing" : "grab",
-                    background: "var(--chip-soft)",
-                  }}
-                >
-                  <div>
-                    <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                      CONTROLLER
-                    </div>
-                    <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-                      {panelTab === "play"
-                        ? "Drag the deck wherever it fits your screen."
-                        : "Settings and docs pause button input until you return to Play."}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={resetControllerPosition}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      className="rounded-full px-3 py-2 transition"
-                      style={{ background: "var(--chip)", color: "var(--text-strong)" }}
-                    >
-                      <span className="zp-font-mono text-[9px]">RESET</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setControllerMinimized(true)}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      className="rounded-full px-3 py-2 transition"
-                      style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
-                    >
-                      <span className="zp-font-mono text-[9px]">MIN</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <div className="rounded-full px-3 py-1 text-[14px] leading-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
-                    {currentTheme.name} · {room}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {(["play", "settings", "about"] as ControlPanelTab[]).map((tab) => {
-                      const active = panelTab === tab;
-                      return (
-                        <button
-                          key={tab}
-                          type="button"
-                          onClick={() => setPanelTab(tab)}
-                          className="rounded-full px-3 py-2 transition"
-                          style={{
-                            background: active ? "var(--shell-warm)" : "var(--chip-soft)",
-                            color: "var(--text-strong)",
-                            boxShadow: active
-                              ? "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14)"
-                              : "inset 2px 2px 0 rgba(255,255,255,0.22), inset -2px -2px 0 rgba(0,0,0,0.08)",
-                          }}
-                        >
-                          <span className="zp-font-mono text-[9px]">{tab.toUpperCase()}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {panelTab === "play" ? (
-                  <>
-                    <div className="mt-4 flex items-center justify-end">
-                      <button
-                        type="button"
-                        onClick={() => tap("7")}
-                        disabled={controlsDisabled}
-                        className="rounded-full px-4 py-2 transition disabled:cursor-wait disabled:opacity-70"
-                        style={{
-                          background: "var(--shell-warm)",
-                          color: "var(--text-strong)",
-                          boxShadow: controlsDisabled
-                            ? "inset 2px 2px 0 rgba(0,0,0,0.12)"
-                            : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.18)",
-                        }}
-                      >
-                        <span className="zp-font-mono text-[10px]">SEND START INPUT</span>
-                      </button>
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between gap-4">
-                      <div className="grid grid-cols-3 gap-2 rounded-[22px] p-3" style={{ background: "var(--shell-secondary)" }}>
-                        <div />
-                        <DpadButton
-                          label="UP"
-                          active={pendingTapCode === "2"}
-                          disabled={controlsDisabled}
-                          onPress={beginPointerPress("2")}
-                        />
-                        <div />
-                        <DpadButton
-                          label="LEFT"
-                          active={pendingTapCode === "1"}
-                          disabled={controlsDisabled}
-                          onPress={beginPointerPress("1")}
-                        />
-                        <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
-                        <DpadButton
-                          label="RIGHT"
-                          active={pendingTapCode === "0"}
-                          disabled={controlsDisabled}
-                          onPress={beginPointerPress("0")}
-                        />
-                        <div />
-                        <DpadButton
-                          label="DOWN"
-                          active={pendingTapCode === "3"}
-                          disabled={controlsDisabled}
-                          onPress={beginPointerPress("3")}
-                        />
-                        <div />
-                      </div>
-
-                      <div className="flex -rotate-12 flex-col items-center gap-4">
-                        {actionButtons.map((button) => (
-                          <ActionButton
-                            key={button.code}
-                            button={button}
-                            active={pendingTapCode === button.code}
-                            disabled={controlsDisabled}
-                            onPress={beginPointerPress(button.code)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-center gap-4">
-                      {menuButtons.map((button) => (
-                        <MenuButton
-                          key={button.code}
-                          label={button.label}
-                          active={pendingTapCode === button.code}
-                          disabled={controlsDisabled}
-                          onClick={pressMenuButton(button.code)}
-                        />
-                      ))}
-                    </div>
-
-                    <div className="mt-4 grid gap-2 text-[14px] leading-4 sm:grid-cols-2" style={{ color: "var(--text-soft)" }}>
-                      {BUTTONS.map((button) => (
-                        <div key={button.code} className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)" }}>
-                          <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>
-                            {button.label}
-                          </span>
-                          <span className="ml-2">{button.hint}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-
-                {panelTab === "settings" ? (
-                  <div className="mt-5 space-y-3 text-[15px] leading-4">
-                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
-                      Button inputs are paused while you change controller settings.
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        aria-pressed={keyboardEnabled}
-                        onClick={() => setKeyboardEnabled((current) => !current)}
-                        className="rounded-[18px] px-4 py-4 text-left transition"
-                        style={{
-                          background: keyboardEnabled ? "var(--chip-alt)" : "var(--chip-soft)",
-                          boxShadow: keyboardEnabled
-                            ? "inset 2px 2px 0 rgba(255,255,255,0.45), inset -2px -2px 0 rgba(140,48,40,0.22)"
-                            : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.12)",
-                        }}
-                        title="Opt in if you want keyboard controls."
-                      >
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          KEYBOARD: {keyboardEnabled ? "ON" : "OFF"}
-                        </div>
-                        <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
-                          {keyboardEnabled ? "Keyboard play is armed." : "Keyboard play is blocked."}
-                        </div>
-                        <div className="mt-2" style={{ color: "var(--text-muted)" }}>
-                          Opt in to avoid accidental inputs while browsing.
-                        </div>
-                      </button>
-
-                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          CONTROLLER POSITION
-                        </div>
-                        <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
-                          Keep the controller out of the screen area.
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={resetControllerPosition}
-                            className="rounded-full px-3 py-2 transition"
-                            style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
-                          >
-                            <span className="zp-font-mono text-[9px]">RESET POSITION</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setControllerMinimized(true)}
-                            className="rounded-full px-3 py-2 transition"
-                            style={{ background: "var(--chip)", color: "var(--text-strong)" }}
-                          >
-                            <span className="zp-font-mono text-[9px]">MINIMIZE</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          ROOM NICKNAME
-                        </div>
-                        <label className="mt-3 block">
-                          <span className="text-[16px]" style={{ color: "var(--text-strong)" }}>
-                            Visible in room {room}.
-                          </span>
-                          <input
-                            type="text"
-                            value={playerName}
-                            onChange={(event) => setPlayerName(event.target.value.slice(0, 24))}
-                            placeholder="guest"
-                            className="mt-3 w-full rounded-[14px] border px-3 py-3 text-[17px] outline-none"
-                            style={{
-                              borderColor: "rgba(0,0,0,0.1)",
-                              background: "rgba(255,255,255,0.6)",
-                              color: "var(--text-strong)",
-                            }}
-                          />
-                        </label>
-                        <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
-                          Saved in this browser for this room only.
-                        </p>
-                      </div>
-
-                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          LIVE ACTIVITY WINDOW
-                        </div>
-                        <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
-                          Move or hide the activity feed separately from the controller.
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
-                            className="rounded-full px-3 py-2 transition"
-                            style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
-                          >
-                            <span className="zp-font-mono text-[9px]">RESET WINDOW</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActivityMinimized((current) => !current)}
-                            className="rounded-full px-3 py-2 transition"
-                            style={{ background: "var(--chip)", color: "var(--text-strong)" }}
-                          >
-                            <span className="zp-font-mono text-[9px]">{activityMinimized ? "OPEN" : "MINIMIZE"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                            THEME
-                          </div>
-                          <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
-                            {currentTheme.name}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={randomizeTheme}
-                          className="rounded-full px-3 py-2 transition"
-                          style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
-                        >
-                          <span className="zp-font-mono text-[9px]">RANDOMIZE</span>
-                        </button>
-                      </div>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {THEME_PRESETS.map((theme) => {
-                          const selected = theme.id === themeId;
-                          return (
-                            <button
-                              key={theme.id}
-                              type="button"
-                              onClick={() => setThemeId(theme.id)}
-                              className="rounded-[16px] border px-3 py-3 text-left transition"
-                              style={{
-                                borderColor: selected ? "var(--text-strong)" : "rgba(0,0,0,0.08)",
-                                background: selected ? "var(--panel-soft)" : "rgba(255,255,255,0.18)",
-                                boxShadow: selected ? "0 0 0 2px rgba(0,0,0,0.08) inset" : "none",
-                              }}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div>
-                                  <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                                    {selected ? "ACTIVE" : "RETAIL"}
-                                  </div>
-                                  <div className="mt-2 text-[16px]" style={{ color: "var(--text-strong)" }}>
-                                    {theme.name}
-                                  </div>
-                                </div>
-                                <div className="flex gap-1">
-                                  {theme.swatches.map((swatch) => (
-                                    <span
-                                      key={swatch}
-                                      className="zp-swatch block h-4 w-4 rounded-full"
-                                      style={{ background: swatch }}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                              <p className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
-                                {theme.note}
-                              </p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {panelTab === "about" ? (
-                  <div className="mt-5 space-y-3 text-[15px] leading-4">
-                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                      <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                        ABOUT THIS ROOM
-                      </div>
-                      <p className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
-                        This route records a real shared Pokemon Crystal session and exposes the coordination model, frame timing, and interface behavior as a public case study.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          ROOM MODEL
-                        </div>
-                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
-                          The room model exists to document how isolated shared sessions were handled in the live system. Public copy should describe that architecture without treating it as a replication guide.
-                        </p>
-                      </div>
-                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          INPUT + FRAME SYNC
-                        </div>
-                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
-                          The page long-polls room state, tracks frame versions and hashes, and refreshes the PNG only when a newer frame is ready.
-                        </p>
-                      </div>
-                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          CUSTOMIZATION
-                        </div>
-                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
-                          Theme presets, keyboard opt-in, and the floating draggable controller are all saved in your browser.
-                        </p>
-                      </div>
-                      <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                          BACKEND
-                        </div>
-                        <p className="mt-2" style={{ color: "var(--text-strong)" }}>
-                          A hosted PyBoy service runs the emulator, while Zo Space serves the controller UI and API routes that proxy room state, input, and frames.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                      <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                        SOURCE
-                      </div>
-                      <a
-                        href={REPO_URL}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-flex rounded-full px-4 py-2 transition"
-                        style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
-                      >
-                        <span className="zp-font-mono text-[9px]">OPEN GITHUB REPO</span>
-                      </a>
-                      <p className="mt-3" style={{ color: "var(--text-muted)" }}>
-                        Mirror repo for the live Zo Space routes and emulator service source, kept as evidence and analysis rather than a starter kit.
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              renderControllerContent(false)
             )}
           </div>
         ) : null}
 
-        {activityPosition ? (
+        {!isMobile && activityPosition ? (
           <div
             ref={activityRef}
             className="fixed z-30"
@@ -1926,78 +2060,7 @@ export default function ZoPlaysPokemonPage() {
                 </button>
               </div>
             ) : (
-              <div
-                className="rounded-[26px] border border-black/10 px-4 py-4 shadow-[0_20px_40px_rgba(0,0,0,0.28)]"
-                style={{ background: "var(--shell-primary)" }}
-              >
-                <div
-                  className="flex items-start justify-between gap-3 rounded-[18px] px-3 py-3"
-                  onPointerDown={beginActivityDrag}
-                  style={{
-                    touchAction: "none",
-                    cursor: draggingActivity ? "grabbing" : "grab",
-                    background: "var(--chip-soft)",
-                  }}
-                >
-                  <div>
-                    <div className="zp-font-mono text-[10px]" style={{ color: "var(--text-soft)" }}>
-                      LIVE ACTIVITY
-                    </div>
-                    <p className="mt-1 text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-                      Watch the room log in its own movable window.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setActivityPosition(normalizeActivityPosition(getDefaultActivityPosition(activityMinimized), activityMinimized))}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      className="rounded-full px-3 py-2 transition"
-                      style={{ background: "var(--chip)", color: "var(--text-strong)" }}
-                    >
-                      <span className="zp-font-mono text-[9px]">RESET</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActivityMinimized(true)}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      className="rounded-full px-3 py-2 transition"
-                      style={{ background: "var(--shell-warm)", color: "var(--text-strong)" }}
-                    >
-                      <span className="zp-font-mono text-[9px]">MIN</span>
-                    </button>
-                  </div>
-                </div>
-
-                <p className="mt-4 text-[15px] leading-4" style={{ color: "var(--text-soft)" }}>
-                  Last state update: {new Date(updatedAt).toLocaleTimeString()} · input {inputVersion}
-                </p>
-
-                <div className="mt-4 max-h-72 space-y-2 overflow-auto">
-                  {events.length === 0 ? (
-                    <p className="text-[18px]" style={{ color: "var(--text-muted)" }}>
-                      No recent input yet.
-                    </p>
-                  ) : (
-                    events.map((event, index) => {
-                      const button = BUTTON_LOOKUP[event.button];
-                      return (
-                        <div
-                          key={`${event.timestamp}-${index}`}
-                          className="flex items-center justify-between gap-3 rounded-[14px] px-3 py-2 text-[15px] leading-4"
-                          style={{ background: "var(--chip-soft)", color: "var(--text-strong)" }}
-                        >
-                          <span>
-                            <span className="zp-font-mono mr-2 text-[9px]">{button?.label || event.button}</span>
-                            {describeEvent(event)} by {event.user}
-                          </span>
-                          <span style={{ color: "var(--text-muted)" }}>{new Date(event.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+              renderActivityContent(false)
             )}
           </div>
         ) : null}
