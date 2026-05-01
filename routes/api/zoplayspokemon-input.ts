@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { checkInputLimits, extractClientIp, undoInputLimitCommit } from "./_zoplayspokemon-input-limit";
 
 type InputEvent = {
   action: string;
@@ -34,6 +35,8 @@ const KEY = "__zoplayspokemon_state";
 const MAX_EVENTS = 80;
 const ALLOWED = new Set(["0", "1", "2", "3", "4", "5", "6", "7"]);
 const ACTIONS = new Set(["tap", "press", "release"]);
+/** Reject new inputs when the mirrored queue is this deep (protects overloaded rooms). */
+const MAX_ACCEPTED_QUEUE_DEPTH = 42;
 
 function getState(room: string): ShareState {
   const g = globalThis as typeof globalThis & { [KEY]?: Record<string, ShareState> };
@@ -79,6 +82,40 @@ export default async (c: Context) => {
       return c.json({ error: "Invalid action" }, 400);
     }
 
+    const state = getState(room);
+    if (state.queueDepth >= MAX_ACCEPTED_QUEUE_DEPTH) {
+      return c.json(
+        {
+          error: "Room input queue is full; try again in a moment",
+          code: "queue_full",
+          queueDepth: state.queueDepth,
+        },
+        429,
+      );
+    }
+
+    const clientIp = extractClientIp(c);
+    const committedAtMs = Date.now();
+    const limits = checkInputLimits({
+      ip: clientIp,
+      room,
+      user,
+      action,
+      now: committedAtMs,
+    });
+    if (!limits.ok) {
+      const retrySec = Math.max(1, Math.ceil(limits.retryAfterMs / 1000));
+      c.header("Retry-After", String(retrySec));
+      return c.json(
+        {
+          error: "Too many inputs; slow down briefly",
+          code: limits.reason,
+          retryAfterMs: limits.retryAfterMs,
+        },
+        429,
+      );
+    }
+
     const upstream = await fetch(`${SERVICE_URL}/input`, {
       method: "POST",
       headers: {
@@ -89,12 +126,12 @@ export default async (c: Context) => {
     });
 
     if (!upstream.ok) {
+      undoInputLimitCommit({ ip: clientIp, room, user, action, ts: committedAtMs });
       const detail = await upstream.text().catch(() => "");
       return c.json({ error: "Local emulator input failed", status: upstream.status, detail }, 502);
     }
 
     const upstreamData = (await upstream.json().catch(() => null)) as UpstreamInputResponse | null;
-    const state = getState(room);
     const timestamp = Date.now();
     const event: InputEvent = { button, action, user, timestamp };
 

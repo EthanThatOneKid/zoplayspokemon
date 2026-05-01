@@ -26,6 +26,7 @@ The live route already includes the retail theme presets, floating controller UI
 ## State
 
 - Zo Space mirror state remains in-memory and keyed `__zoplayspokemon_state`
+- Input route uses additional in-memory sliding-window limits keyed `__zoplayspokemon_input_limit` (429 responses with `Retry-After` when limits or mirrored queue ceiling trip)
 - Backend emulator worlds now persist per room on disk via PyBoy snapshots + `meta.json`
 - State route now long-polls and mirrors backend `inputVersion` / `frameVersion` metadata
 

@@ -79,7 +79,9 @@ Returns current game state and recent input log.
 - `action`: string — `"tap"`, `"press"`, or `"release"`
 - `user`: string — anonymous visitor ID
 
-Returns `{ "ok": true, "event": { ... } }` on success, or `{ "error": "..." }` on failure.
+Returns `{ "ok": true, "event": { ... } }` on success, or `{ "error": "...", "code"?: string, "retryAfterMs"?: number }` on failure.
+
+**Fair use limits (Zo Space route):** the input route applies per-client and per-room sliding windows (~60s), a short cooldown between successive tap/press actions per nickname (excluding `release`), and rejects when the mirrored room queue exceeds a ceiling. Repeated abuse returns **429** with `Retry-After` plus `retryAfterMs` when applicable.
 
 ### `GET /api/zoplayspokemon-share`
 

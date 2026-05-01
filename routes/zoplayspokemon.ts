@@ -921,6 +921,24 @@ export default function ZoPlaysPokemonPage() {
     setError(message);
   };
 
+  const describeInputFailure = (status: number, data: Record<string, unknown>) => {
+    const raw = typeof data.error === "string" ? data.error : "Failed to send input";
+    if (status === 429) {
+      const retryMs = Number(data.retryAfterMs);
+      if (Number.isFinite(retryMs) && retryMs > 0) {
+        const sec = Math.max(1, Math.round(retryMs / 1000));
+        return `${raw} — retry ~${sec}s`;
+      }
+      if (data.code === "queue_full") {
+        const q = Number(data.queueDepth);
+        if (Number.isFinite(q)) {
+          return `${raw} (${q} in queue)`;
+        }
+      }
+    }
+    return raw;
+  };
+
   const fetchState = async (nextRoom: string, useCursor: boolean, timeoutMs: number) => {
     const query = new URLSearchParams({ room: nextRoom });
     if (useCursor) {
@@ -981,8 +999,8 @@ export default function ZoPlaysPokemonPage() {
         body: JSON.stringify({ room, button: code, action, user: playerName.trim() || "guest" }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        failInput(data.error || "Failed to send input");
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        failInput(describeInputFailure(res.status, data));
         return false;
       }
       const data = await res.json().catch(() => ({}));
@@ -1373,7 +1391,10 @@ export default function ZoPlaysPokemonPage() {
 
   useEffect(() => {
     if (!error) return;
-    const timer = window.setTimeout(() => setError(""), 3000);
+    const needsReadTime =
+      /\bretry\b/i.test(error) || /\bqueue\b/i.test(error) || /slow down/i.test(error);
+    const delay = needsReadTime ? 5200 : 3000;
+    const timer = window.setTimeout(() => setError(""), delay);
     return () => window.clearTimeout(timer);
   }, [error]);
 
