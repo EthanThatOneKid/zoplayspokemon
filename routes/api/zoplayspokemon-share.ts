@@ -1,5 +1,6 @@
 import type { Context } from "hono";
-import { ZOP_GLOBAL_ROOM } from "./_zoplayspokemon-global";
+
+const ZOP_GLOBAL_ROOM = "main";
 
 type RoomInfo = {
   acceptedInputVersion?: number;

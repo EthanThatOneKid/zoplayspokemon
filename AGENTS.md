@@ -47,3 +47,9 @@ The live route already includes the retail theme presets, floating controller UI
 - Routes live at: https://github.com/EthanThatOneKid/zoplayspokemon
 - Export from zo.space → `bun export.ts --name zoplayspokemon`
 - Import to zo.space → `bun import.ts` (from repo root)
+
+## Route Hygiene
+
+- Keep `routes/api/` reserved for real public endpoints only.
+- Do not add helper-only modules under `routes/api/`; Zo will load them as routes.
+- Prefer self-contained route files or move shared logic outside the route tree entirely.
