@@ -1,7 +1,9 @@
 #!/usr/bin/env python3.12
 """
 Self-hosted shared Game Boy service for Zo.
-Streams PNG frames and accepts queued button input for shared rooms.
+Streams PNG frames and accepts queued button input.
+
+POC: one live emulator process (`GLOBAL_ROOM_NAME`); `room` query/body fields are ignored for routing.
 """
 import argparse
 import hashlib
@@ -74,6 +76,9 @@ ACTION_MAP = {"tap", "press", "release"}
 
 lock = threading.Lock()
 rooms: dict[str, dict] = {}
+
+# POC: single live emulator; ?room= / JSON room are ignored for isolation (still echoed where helpful).
+GLOBAL_ROOM_NAME = "main"
 
 
 def sha256_file(path: str | Path) -> str:
@@ -216,8 +221,8 @@ def frame_hash(frame_bytes: bytes) -> str:
     return hashlib.sha256(frame_bytes).hexdigest()[:16]
 
 
-def get_room(name: str) -> dict:
-    room_name = (name or "main")[:32]
+def get_room(_ignored_room_param: str) -> dict:
+    room_name = GLOBAL_ROOM_NAME
     with lock:
         if room_name not in rooms:
             rooms[room_name] = {

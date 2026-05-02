@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { ZOP_GLOBAL_ROOM } from "./_zoplayspokemon-global";
 import { checkInputLimits, extractClientIp, undoInputLimitCommit } from "./_zoplayspokemon-input-limit";
 
 type InputEvent = {
@@ -73,7 +74,7 @@ export default async (c: Context) => {
     const button = String(body.button || "");
     const action = String(body.action || "tap").toLowerCase();
     const user = String(body.user || "anon").slice(0, 24);
-    const room = String(body.room || "main").slice(0, 32) || "main";
+    const room = ZOP_GLOBAL_ROOM;
 
     if (!ALLOWED.has(button)) {
       return c.json({ error: "Invalid button" }, 400);
@@ -86,7 +87,7 @@ export default async (c: Context) => {
     if (state.queueDepth >= MAX_ACCEPTED_QUEUE_DEPTH) {
       return c.json(
         {
-          error: "Room input queue is full; try again in a moment",
+          error: "Input queue is full; try again in a moment",
           code: "queue_full",
           queueDepth: state.queueDepth,
         },

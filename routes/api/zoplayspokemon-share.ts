@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { ZOP_GLOBAL_ROOM } from "./_zoplayspokemon-global";
 
 type RoomInfo = {
   acceptedInputVersion?: number;
@@ -17,8 +18,6 @@ type RoomInfo = {
 
 const SERVICE_URL = "https://zo-gameboy-etok.zocomputer.io";
 const SPACE_URL = "https://etok.zo.space";
-const DEFAULT_ROOM = "main";
-const MAX_ROOM_LENGTH = 32;
 const BUTTON_NAMES: Record<string, string> = {
   "0": "RIGHT",
   "1": "LEFT",
@@ -29,10 +28,6 @@ const BUTTON_NAMES: Record<string, string> = {
   "6": "SELECT",
   "7": "START",
 };
-
-function sanitizeRoom(value: string | undefined): string {
-  return String(value || DEFAULT_ROOM).slice(0, MAX_ROOM_LENGTH) || DEFAULT_ROOM;
-}
 
 function readNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -79,9 +74,9 @@ function describeSnapshot(info: RoomInfo): string {
   return "no snapshot yet";
 }
 
-function buildDescription(room: string, info: RoomInfo | undefined, now: number): string {
+function buildDescription(info: RoomInfo | undefined, now: number): string {
   if (!info) {
-    return `Room ${room} is standing by. Open the live Zo Plays Pokemon case-study feed to watch the next documented frame land.`;
+    return `The shared session is standing by. Open the live Zo Plays Pokemon case-study feed to watch the next documented frame land.`;
   }
 
   const frameVersion = readNumber(info.presentedFrameVersion, 0);
@@ -93,11 +88,11 @@ function buildDescription(room: string, info: RoomInfo | undefined, now: number)
     queueDepth > 0
       ? "Chaos is brewing"
       : lastInputAt > 0
-        ? "Room is live"
-        : "Room is idling";
+        ? "Session is live"
+        : "Session is idling";
   const activity = lastInputAt > 0 ? formatRelativeTime(lastInputAt, now) : "none yet";
 
-  return `${mood} for ${room}: frame ${frameVersion}, input ${inputVersion}, ${describeQueue(queueDepth)}, ${describeHeldButtons(heldButtons)}, last move ${activity}, ${describeSnapshot(info)}.`;
+  return `${mood}: frame ${frameVersion}, input ${inputVersion}, ${describeQueue(queueDepth)}, ${describeHeldButtons(heldButtons)}, last move ${activity}, ${describeSnapshot(info)}.`;
 }
 
 function escapeHtml(value: string): string {
@@ -124,16 +119,15 @@ async function fetchRoomInfo(room: string): Promise<RoomInfo | undefined> {
 }
 
 export default async (c: Context) => {
-  const room = sanitizeRoom(c.req.query("room"));
   const now = Date.now();
-  const roomInfo = await fetchRoomInfo(room);
+  const roomInfo = await fetchRoomInfo(ZOP_GLOBAL_ROOM);
   const frameVersion = readNumber(roomInfo?.presentedFrameVersion, 0);
   const lastFrameAt = readNumber(roomInfo?.lastFrameAt, 0);
-  const liveUrl = `${SPACE_URL}/zoplayspokemon?room=${encodeURIComponent(room)}`;
-  const shareUrl = `${SPACE_URL}/api/zoplayspokemon-share?room=${encodeURIComponent(room)}`;
-  const ogImageUrl = `${SPACE_URL}/api/zoplayspokemon-frame?room=${encodeURIComponent(room)}&v=${frameVersion}&t=${lastFrameAt || now}`;
-  const title = `Zo Plays Pokemon · room ${room} · frame ${frameVersion}`;
-  const description = buildDescription(room, roomInfo, now);
+  const liveUrl = `${SPACE_URL}/zoplayspokemon`;
+  const shareUrl = `${SPACE_URL}/api/zoplayspokemon-share`;
+  const ogImageUrl = `${SPACE_URL}/api/zoplayspokemon-frame?v=${frameVersion}&t=${lastFrameAt || now}`;
+  const title = `Zo Plays Pokemon · frame ${frameVersion}`;
+  const description = buildDescription(roomInfo, now);
   const html = `<!doctype html>
 <html lang="en">
   <head>
@@ -180,8 +174,8 @@ export default async (c: Context) => {
   </head>
   <body>
     <main>
-      <p>Opening room ${escapeHtml(room)}…</p>
-      <p><a href="${escapeHtml(liveUrl)}">Continue to the live room</a></p>
+      <p>Opening the live feed…</p>
+      <p><a href="${escapeHtml(liveUrl)}">Continue to Zo Plays Pokemon</a></p>
     </main>
     <script>
       window.location.replace(${JSON.stringify(liveUrl)});

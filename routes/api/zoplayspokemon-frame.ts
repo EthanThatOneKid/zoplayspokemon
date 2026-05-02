@@ -1,9 +1,10 @@
 import type { Context } from "hono";
+import { ZOP_GLOBAL_ROOM } from "./_zoplayspokemon-global";
 
 const SERVICE_URL = "https://zo-gameboy-etok.zocomputer.io";
 
 export default async (c: Context) => {
-  const room = String(c.req.query("room") || "main").slice(0, 32) || "main";
+  const room = ZOP_GLOBAL_ROOM;
   const upstream = await fetch(`${SERVICE_URL}/image?room=${encodeURIComponent(room)}`);
 
   if (!upstream.ok || !upstream.body) {

@@ -20,15 +20,15 @@ The live route already includes the retail theme presets, floating controller UI
 | `/zoplayspokemon` | page | Interactive pad UI with live screen feed |
 | `/api/zoplayspokemon-state` | api | GET recent button events |
 | `/api/zoplayspokemon-input` | api | POST a tap, press, or release → upstream service |
-| `/api/zoplayspokemon-frame` | api | GET proxied PNG frame for a room |
-| `/api/zoplayspokemon-share` | api | GET server-rendered share HTML for room-aware OGP unfurls |
+| `/api/zoplayspokemon-frame` | api | GET proxied PNG frame (single fixed upstream room `main`) |
+| `/api/zoplayspokemon-share` | api | GET server-rendered share HTML for OGP unfurls |
 
 ## State
 
 - Zo Space mirror state remains in-memory and keyed `__zoplayspokemon_state`
 - Input route uses additional in-memory sliding-window limits keyed `__zoplayspokemon_input_limit` (429 responses with `Retry-After` when limits or mirrored queue ceiling trip)
 - Backend emulator worlds now persist per room on disk via PyBoy snapshots + `meta.json`
-- State route now long-polls and mirrors backend `inputVersion` / `frameVersion` metadata
+- State route now long-polls and mirrors backend `inputVersion` / `frameVersion` metadata (no `room` query param; mirrors `_zoplayspokemon-global` room `main`)
 
 ## Service
 

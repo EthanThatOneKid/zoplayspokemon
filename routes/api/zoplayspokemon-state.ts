@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { ZOP_GLOBAL_ROOM } from "./_zoplayspokemon-global";
 
 type InputEvent = {
   action?: string;
@@ -190,7 +191,7 @@ function hasFreshData(
 }
 
 export default async (c: Context) => {
-  const room = String(c.req.query("room") || "main").slice(0, 32) || "main";
+  const room = ZOP_GLOBAL_ROOM;
   const state = getState(room);
   const sinceInputVersion = Number(c.req.query("sinceInputVersion") || -1);
   const sinceFrameVersion = Number(c.req.query("sinceFrameVersion") || -1);
@@ -217,7 +218,7 @@ export default async (c: Context) => {
 
   return c.json({
     room,
-    streamUrl: `/api/zoplayspokemon-frame?room=${encodeURIComponent(room)}`,
+    streamUrl: `/api/zoplayspokemon-frame`,
     controls: {
       up: "2",
       down: "3",

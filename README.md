@@ -14,7 +14,7 @@ An educational mirror repo for a collaborative Pokemon emulator-control experime
 | `/api/zoplayspokemon-state` | API | GET — returns recent input events + long-poll frame/input metadata |
 | `/api/zoplayspokemon-input` | API | POST — send a tap, press, or release |
 | `/api/zoplayspokemon-frame` | API | GET — returns the latest proxied PNG frame |
-| `/api/zoplayspokemon-share` | API | GET — server-rendered room share HTML with dynamic OGP image + live stats description |
+| `/api/zoplayspokemon-share` | API | GET — server-rendered share HTML with dynamic OGP image + live stats description |
 
 ## Public Positioning
 
@@ -57,7 +57,7 @@ Returns current game state and recent input log.
 ```json
 {
   "room": "main",
-  "streamUrl": "/api/zoplayspokemon-frame?room=main",
+  "streamUrl": "/api/zoplayspokemon-frame",
   "controls": { "up": "2", "down": "3", ... },
   "updatedAt": 1715000000000,
   "inputVersion": 12,
@@ -71,27 +71,25 @@ Returns current game state and recent input log.
 ### `POST /api/zoplayspokemon-input`
 
 ```json
-{ "room": "main", "button": "4", "action": "press", "user": "a3f2b1" }
+{ "button": "4", "action": "press", "user": "a3f2b1" }
 ```
 
-- `room`: string — room identifier used by the documented live system
 - `button`: string — one of `"0"`–`"7"` (RIGHT, LEFT, UP, DOWN, A, B, SELECT, START)
 - `action`: string — `"tap"`, `"press"`, or `"release"`
 - `user`: string — anonymous visitor ID
 
 Returns `{ "ok": true, "event": { ... } }` on success, or `{ "error": "...", "code"?: string, "retryAfterMs"?: number }` on failure.
 
-**Fair use limits (Zo Space route):** the input route applies per-client and per-room sliding windows (~60s), a short cooldown between successive tap/press actions per nickname (excluding `release`), and rejects when the mirrored room queue exceeds a ceiling. Repeated abuse returns **429** with `Retry-After` plus `retryAfterMs` when applicable.
+**Fair use limits (Zo Space route):** the input route applies per-client and aggregate sliding windows (~60s), a short cooldown between successive tap/press actions per nickname (excluding `release`), and rejects when the mirrored input queue exceeds a ceiling. Repeated abuse returns **429** with `Retry-After` plus `retryAfterMs` when applicable.
 
 ### `GET /api/zoplayspokemon-share`
 
-Returns HTML for link unfurls and immediately forwards humans to the live room page.
+Returns HTML for link unfurls and immediately forwards humans to the live page.
 
-- query param: `room` — room identifier, defaults to `main`
-- `og:image` points at the current room frame via `/api/zoplayspokemon-frame`
-- `og:description` summarizes recent live state from the hosted room metadata
+- `og:image` points at the current frame via `/api/zoplayspokemon-frame`
+- `og:description` summarizes recent live state from the hosted session metadata
 
-Use this URL when sharing a room if you want Discord/X/OGP testers to show the actual current frame instead of Zo Space's default generic card.
+Use this URL if you want Discord/X/OGP testers to show the actual current frame instead of Zo Space's default generic card.
 
 ## Secrets
 
