@@ -96,6 +96,11 @@ Uses 4px base grid. Components align to multiples of 4.
 - Active state: inset shadow, darkened fill
 - States: default, pressed (inset), disabled (opacity 0.5)
 
+### Mobile Joystick
+- On small screens, the controller swaps the D-pad grid for a circular joystick
+- Dragging from the stick center maps to the same four directions as desktop input
+- Releasing the touch returns the stick to center and releases the held direction
+
 ### Action Buttons
 - A: red (`button-a`), B: purple (`button-b`)
 - Circular with slight bevel (CSS `box-shadow` for depth)

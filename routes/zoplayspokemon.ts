@@ -751,6 +751,126 @@ function MenuButton({
   );
 }
 
+function JoystickPad({
+  activeCode,
+  disabled,
+  onChange,
+}: {
+  activeCode: string | null;
+  disabled: boolean;
+  onChange: (code: string | null) => void;
+}) {
+  const padRef = useRef<HTMLDivElement | null>(null);
+  const pointerStateRef = useRef<{ pointerId: number; code: string | null } | null>(null);
+
+  const pickJoystickCode = (event: ReactPointerEvent<HTMLDivElement>, rect: DOMRect) => {
+    const x = event.clientX;
+    const y = event.clientY;
+    const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    if (!inside) return null;
+
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = x - cx;
+    const dy = y - cy;
+    const deadzone = Math.min(rect.width, rect.height) * 0.28;
+    if (Math.hypot(dx, dy) < deadzone) return null;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      return dx > 0 ? "0" : "1";
+    }
+    return dy > 0 ? "3" : "2";
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const rect = padRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    pointerStateRef.current = { pointerId: event.pointerId, code: null };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    onChange(pickJoystickCode(event, rect));
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const state = pointerStateRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    const rect = padRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const nextCode = pickJoystickCode(event, rect);
+    if (state.code === nextCode) return;
+    pointerStateRef.current = { pointerId: event.pointerId, code: nextCode };
+    event.preventDefault();
+    onChange(nextCode);
+  };
+
+  const handlePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = pointerStateRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    pointerStateRef.current = null;
+    event.preventDefault();
+    onChange(null);
+  };
+
+  const knobOffset =
+    activeCode === "0"
+      ? { x: 38, y: 0 }
+      : activeCode === "1"
+        ? { x: -38, y: 0 }
+        : activeCode === "2"
+          ? { x: 0, y: -38 }
+          : activeCode === "3"
+            ? { x: 0, y: 38 }
+            : { x: 0, y: 0 };
+
+  return (
+    <div className="space-y-3">
+      <div
+        ref={padRef}
+        className="relative mx-auto aspect-square w-full max-w-[190px] rounded-full border border-black/15 p-3 shadow-[inset_0_3px_0_rgba(255,255,255,0.22),inset_0_-4px_0_rgba(0,0,0,0.18)]"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.26), transparent 38%), var(--shell-secondary)",
+          touchAction: "none",
+        }}
+        aria-label="Mobile joystick"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <div
+          className="absolute inset-7 rounded-full border border-black/10"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.22), rgba(0,0,0,0.04) 58%, rgba(0,0,0,0.1) 100%)",
+          }}
+        />
+        <div
+          className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/20 transition-transform duration-75"
+          style={{
+            background:
+              "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.5), rgba(255,255,255,0.15) 24%, rgba(0,0,0,0.08) 100%), var(--shell-primary)",
+            boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.45), inset -4px -4px 0 rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.18)",
+            transform: `translate(calc(-50% + ${knobOffset.x}px), calc(-50% + ${knobOffset.y}px))`,
+          }}
+        />
+        <div className="absolute inset-x-0 top-4 text-center text-[9px]" style={{ color: "var(--text-soft)" }}>
+          <span className="zp-font-mono">DRAG TO MOVE</span>
+        </div>
+        <div className="absolute inset-x-0 bottom-4 text-center text-[9px]" style={{ color: "var(--text-muted)" }}>
+          <span className="zp-font-mono">{activeCode ? buttonName(activeCode) : "CENTER"}</span>
+        </div>
+      </div>
+      <p className="text-center text-[14px] leading-4" style={{ color: "var(--text-muted)" }}>
+        Slide the stick to steer. Tap A, B, Start, or Select for the rest.
+      </p>
+    </div>
+  );
+}
+
 export default function ZoPlaysPokemonPage() {
   const [events, setEvents] = useState<InputEvent[]>([]);
   const [updatedAt, setUpdatedAt] = useState<number>(Date.now());
@@ -1730,7 +1850,7 @@ export default function ZoPlaysPokemonPage() {
         <p className="text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
           {panelTab === "play"
             ? isMobileView
-              ? "Enjoy customized touch controls."
+              ? "Drag the joystick to steer on mobile."
               : "Drag the deck wherever it fits your screen."
             : "Settings pause button input until you return to Play."}
         </p>
@@ -1783,38 +1903,62 @@ export default function ZoPlaysPokemonPage() {
               </button>
             </div>
 
-            <div className="mt-5 flex items-center justify-between gap-4">
-              <div
-                className="grid grid-cols-3 gap-2 rounded-[22px] p-3"
-                style={{ background: "var(--shell-secondary)", touchAction: "none" }}
-                onPointerDown={beginDpadPointer}
-                onPointerMove={moveDpadPointer}
-                onPointerUp={endDpadPointer}
-                onPointerCancel={endDpadPointer}
-                onContextMenu={(event) => event.preventDefault()}
-              >
-                <div />
-                <DpadButton label="UP" active={dpadActiveCode === "2"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                <div />
-                <DpadButton label="LEFT" active={dpadActiveCode === "1"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
-                <DpadButton label="RIGHT" active={dpadActiveCode === "0"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                <div />
-                <DpadButton label="DOWN" active={dpadActiveCode === "3"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                <div />
-              </div>
+            <div className="mt-5">
+              {isMobileView ? (
+                <div className="grid gap-5">
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-[220px]">
+                      <JoystickPad activeCode={dpadActiveCode} disabled={controlsDisabled} onChange={(code) => void holdDpad(code)} />
+                    </div>
+                  </div>
 
-              <div className="flex -rotate-12 flex-col items-center gap-4">
-                {actionButtons.map((button) => (
-                  <ActionButton
-                    key={button.code}
-                    button={button}
-                    active={pendingTapCode === button.code}
-                    disabled={controlsDisabled}
-                    onPress={beginPointerPress(button.code)}
-                  />
-                ))}
-              </div>
+                  <div className="flex items-center justify-center gap-4">
+                    {actionButtons.map((button) => (
+                      <ActionButton
+                        key={button.code}
+                        button={button}
+                        active={pendingTapCode === button.code}
+                        disabled={controlsDisabled}
+                        onPress={beginPointerPress(button.code)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-4">
+                  <div
+                    className="grid grid-cols-3 gap-2 rounded-[22px] p-3"
+                    style={{ background: "var(--shell-secondary)", touchAction: "none" }}
+                    onPointerDown={beginDpadPointer}
+                    onPointerMove={moveDpadPointer}
+                    onPointerUp={endDpadPointer}
+                    onPointerCancel={endDpadPointer}
+                    onContextMenu={(event) => event.preventDefault()}
+                  >
+                    <div />
+                    <DpadButton label="UP" active={dpadActiveCode === "2"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
+                    <div />
+                    <DpadButton label="LEFT" active={dpadActiveCode === "1"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
+                    <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
+                    <DpadButton label="RIGHT" active={dpadActiveCode === "0"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
+                    <div />
+                    <DpadButton label="DOWN" active={dpadActiveCode === "3"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
+                    <div />
+                  </div>
+
+                  <div className="flex -rotate-12 flex-col items-center gap-4">
+                    {actionButtons.map((button) => (
+                      <ActionButton
+                        key={button.code}
+                        button={button}
+                        active={pendingTapCode === button.code}
+                        disabled={controlsDisabled}
+                        onPress={beginPointerPress(button.code)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-5 flex items-center justify-center gap-4">
