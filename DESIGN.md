@@ -97,9 +97,11 @@ Uses 4px base grid. Components align to multiples of 4.
 - States: default, pressed (inset), disabled (opacity 0.5)
 
 ### Mobile Joystick
-- On small screens, the controller swaps the D-pad grid for a circular joystick
+- On small screens, the experience switches to a static stacked layout instead of floating windows
+- The control section leads with a circular joystick for touch steering
 - Dragging from the stick center maps to the same four directions as desktop input
 - Releasing the touch returns the stick to center and releases the held direction
+- Keep game, controls, and activity in a fixed top-to-bottom flow on mobile
 
 ### Action Buttons
 - A: red (`button-a`), B: purple (`button-b`)
@@ -147,6 +149,7 @@ Uses 4px base grid. Components align to multiples of 4.
 - Dragging happens from a dedicated handle so game buttons do not move the panel
 - Can minimize into a compact chip to get out of the way
 - Position and minimized state persist via local storage
+- Mobile does not use the floating controller pattern; it stays static in the page flow
 
 ## Interaction Rules
 

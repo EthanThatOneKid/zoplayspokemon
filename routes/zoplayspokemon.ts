@@ -1850,7 +1850,7 @@ export default function ZoPlaysPokemonPage() {
         <p className="text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
           {panelTab === "play"
             ? isMobileView
-              ? "Drag the joystick to steer on mobile."
+              ? "Use the joystick to steer on mobile."
               : "Drag the deck wherever it fits your screen."
             : "Settings pause button input until you return to Play."}
         </p>
@@ -2010,8 +2010,12 @@ export default function ZoPlaysPokemonPage() {
               </button>
 
               <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>CONTROLLER POSITION</div>
-                <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>Keep the controller accessible.</div>
+                <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                  {isMobileView ? "TOUCH CONTROLS" : "CONTROLLER POSITION"}
+                </div>
+                <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                  {isMobileView ? "Touch controls stay fixed in place." : "Keep the controller accessible."}
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -2056,8 +2060,12 @@ export default function ZoPlaysPokemonPage() {
               </div>
 
               <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-                <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>LIVE ACTIVITY WINDOW</div>
-                <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>Move or hide activity feed.</div>
+                <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                  {isMobileView ? "LIVE ACTIVITY" : "LIVE ACTIVITY WINDOW"}
+                </div>
+                <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                  {isMobileView ? "Watch the activity feed in place." : "Move or hide activity feed."}
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {!isMobileView && (
                     <button
@@ -2085,8 +2093,12 @@ export default function ZoPlaysPokemonPage() {
             </div>
 
             <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
-              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>GAME SCREEN WINDOW</div>
-              <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>Scale or reset the live feed display.</div>
+              <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+                {isMobileView ? "GAME SCREEN" : "GAME SCREEN WINDOW"}
+              </div>
+              <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
+                {isMobileView ? "The live feed stays stacked above the controls." : "Scale or reset the live feed display."}
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {!isMobileView && (
                   <button
@@ -2178,7 +2190,7 @@ export default function ZoPlaysPokemonPage() {
               </div>
               <div className="rounded-[18px] px-4 py-4" style={{ background: "var(--chip-soft)" }}>
                 <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>CUSTOMIZATION</div>
-                <p className="mt-2" style={{ color: "var(--text-strong)" }}>Theme presets, keyboard, and windows are saved locally.</p>
+                <p className="mt-2" style={{ color: "var(--text-strong)" }}>Theme presets, keyboard, and layout choices are saved locally.</p>
               </div>
             </div>
 
@@ -2244,7 +2256,9 @@ export default function ZoPlaysPokemonPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0 mt-3 pr-1 select-none">
-        <p className="text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>Watch the activity log in its own window.</p>
+        <p className="text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
+          {isMobileView ? "Watch the activity log in its own section." : "Watch the activity log in its own window."}
+        </p>
         <p className="mt-4 text-[15px] leading-4" style={{ color: "var(--text-soft)" }}>
           Last state: {new Date(updatedAt).toLocaleTimeString()} · input {inputVersion}
         </p>
