@@ -1199,7 +1199,7 @@ export default function ZoPlaysPokemonPage() {
     tap(code);
   };
 
-  const holdDpad = async (nextCode: string | null) => {
+  const handleNipplePadChange = async (nextCode: string | null) => {
     if (controlsLocked) return;
     const currentCode = heldDpadCodeRef.current;
     if (currentCode === nextCode) return;
@@ -1875,9 +1875,9 @@ export default function ZoPlaysPokemonPage() {
 
             <div className="mt-5">
               <div className={isMobileView ? "grid gap-5" : "grid gap-5 lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)] lg:items-center"}>
-                <div className="flex justify-center">
-                  <div className="w-full max-w-[250px]">
-                    <NipplePad activeCode={dpadActiveCode} disabled={controlsLocked} onChange={(code) => void holdDpad(code)} />
+              <div className="flex justify-center">
+                <div className="w-full max-w-[250px]">
+                    <NipplePad activeCode={dpadActiveCode} disabled={controlsLocked} onChange={(code) => void handleNipplePadChange(code)} />
                   </div>
                 </div>
 
