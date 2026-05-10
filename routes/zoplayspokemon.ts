@@ -725,17 +725,30 @@ function MenuButton({
   );
 }
 
-function NipplePad({
+function JoystickPad({
   activeCode,
   disabled,
   onChange,
 }: {
   activeCode: string | null;
   disabled: boolean;
-  onChange: (code: string | null) => void;
+  onChange: (code: string | null) => void | Promise<void>;
 }) {
   const padRef = useRef<HTMLDivElement | null>(null);
   const pointerStateRef = useRef<{ pointerId: number; code: string | null } | null>(null);
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    return () => {
+      if (!pointerStateRef.current) return;
+      pointerStateRef.current = null;
+      void onChangeRef.current(null);
+    };
+  }, []);
 
   const pickJoystickCode = (event: ReactPointerEvent<HTMLDivElement>, rect: DOMRect) => {
     const x = event.clientX;
@@ -787,6 +800,14 @@ function NipplePad({
     onChange(null);
   };
 
+  const handleLostPointerCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = pointerStateRef.current;
+    if (!state || state.pointerId !== event.pointerId) return;
+    pointerStateRef.current = null;
+    event.preventDefault();
+    onChange(null);
+  };
+
   const knobOffset =
     activeCode === "0"
       ? { x: 38, y: 0 }
@@ -808,11 +829,12 @@ function NipplePad({
             "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.26), transparent 38%), var(--shell-secondary)",
           touchAction: "none",
         }}
-        aria-label="Nipple pad"
+        aria-label="Joystick pad"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
+        onLostPointerCapture={handleLostPointerCapture}
         onContextMenu={(event) => event.preventDefault()}
       >
         <div
@@ -832,14 +854,14 @@ function NipplePad({
           }}
         />
         <div className="absolute inset-x-0 top-4 text-center text-[9px]" style={{ color: "var(--text-soft)" }}>
-          <span className="zp-font-mono">NIPPLE PAD: HOLD OR DRAG TO MOVE</span>
+          <span className="zp-font-mono">JOYSTICK PAD: HOLD OR DRAG TO MOVE</span>
         </div>
         <div className="absolute inset-x-0 bottom-4 text-center text-[9px]" style={{ color: "var(--text-muted)" }}>
           <span className="zp-font-mono">{activeCode ? buttonName(activeCode) : "RELEASE TO STOP"}</span>
         </div>
       </div>
       <p className="text-center text-[14px] leading-4" style={{ color: "var(--text-muted)" }}>
-        Hold the nipple pad on desktop or mobile to keep walking. Release to stop. Tap A, B, Start, or Select for the rest.
+        Hold the joystick on desktop or mobile to keep walking. Release to stop. Tap A, B, Start, or Select for the rest.
       </p>
     </div>
   );
@@ -916,6 +938,8 @@ export default function ZoPlaysPokemonPage() {
   const gameResizeStateRef = useRef<{ startWidth: number; startHeight: number; startX: number; startY: number; pointerId: number } | null>(null);
 
   const heldDpadCodeRef = useRef<string | null>(null);
+  const joystickTargetCodeRef = useRef<string | null>(null);
+  const joystickProcessingRef = useRef(false);
 
   const currentTheme = THEME_LOOKUP[themeId] || THEME_PRESETS[0];
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
@@ -1199,26 +1223,51 @@ export default function ZoPlaysPokemonPage() {
     tap(code);
   };
 
-  const handleNipplePadChange = async (nextCode: string | null) => {
-    if (controlsLocked) return;
-    const currentCode = heldDpadCodeRef.current;
-    if (currentCode === nextCode) return;
+  const syncJoystickTarget = async () => {
+    if (joystickProcessingRef.current) return;
+    joystickProcessingRef.current = true;
+    try {
+      while (true) {
+        const nextCode = joystickTargetCodeRef.current;
+        const currentCode = heldDpadCodeRef.current;
+        if (currentCode === nextCode) return;
 
-    setError("");
+        if (currentCode) {
+          const released = await sendInput(currentCode, "release");
+          if (!released) {
+            joystickTargetCodeRef.current = null;
+            return;
+          }
+        }
 
-    if (currentCode) {
-      const released = await sendInput(currentCode, "release");
-      if (!released) return;
-    }
-    heldDpadCodeRef.current = nextCode;
-    setHeldDpadCode(nextCode);
-    if (nextCode) {
-      const pressed = await sendInput(nextCode, "press");
-      if (!pressed) {
-        heldDpadCodeRef.current = null;
-        setHeldDpadCode(null);
+        heldDpadCodeRef.current = nextCode;
+        setHeldDpadCode(nextCode);
+
+        if (nextCode) {
+          const pressed = await sendInput(nextCode, "press");
+          if (!pressed) {
+            heldDpadCodeRef.current = null;
+            setHeldDpadCode(null);
+            joystickTargetCodeRef.current = null;
+            return;
+          }
+        }
+
+        if (joystickTargetCodeRef.current === nextCode) return;
+      }
+    } finally {
+      joystickProcessingRef.current = false;
+      if (joystickTargetCodeRef.current !== heldDpadCodeRef.current) {
+        void syncJoystickTarget();
       }
     }
+  };
+
+  const handleJoystickChange = (nextCode: string | null) => {
+    if (controlsLocked) return;
+    setError("");
+    joystickTargetCodeRef.current = nextCode;
+    void syncJoystickTarget();
   };
 
   const pressMenuButton = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1877,7 +1926,7 @@ export default function ZoPlaysPokemonPage() {
               <div className={isMobileView ? "grid gap-5" : "grid gap-5 lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)] lg:items-center"}>
               <div className="flex justify-center">
                 <div className="w-full max-w-[250px]">
-                    <NipplePad activeCode={dpadActiveCode} disabled={controlsLocked} onChange={(code) => void handleNipplePadChange(code)} />
+                    <JoystickPad activeCode={dpadActiveCode} disabled={controlsLocked} onChange={handleJoystickChange} />
                   </div>
                 </div>
 
