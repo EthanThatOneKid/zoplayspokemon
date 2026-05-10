@@ -35,6 +35,7 @@ At the same time, this repo should not be read as a how-to for launching another
 The documented system works like this:
 
 - the page captures button activity from touch, mouse, or keyboard input
+- desktop stick interactions stay held until release, so movement can keep flowing while the backend catches up
 - `/api/zoplayspokemon-input` forwards that activity to Ethan's hosted emulator service on Zo
 - the emulator service runs a per-room loop, queues taps, maintains held-button state, and checkpoints each room to disk
 - `/api/zoplayspokemon-state` long-polls for fresher input and frame metadata

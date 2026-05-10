@@ -826,14 +826,14 @@ function JoystickPad({
           }}
         />
         <div className="absolute inset-x-0 top-4 text-center text-[9px]" style={{ color: "var(--text-soft)" }}>
-          <span className="zp-font-mono">DRAG TO MOVE</span>
+          <span className="zp-font-mono">HOLD OR DRAG TO MOVE</span>
         </div>
         <div className="absolute inset-x-0 bottom-4 text-center text-[9px]" style={{ color: "var(--text-muted)" }}>
-          <span className="zp-font-mono">{activeCode ? buttonName(activeCode) : "CENTER"}</span>
+          <span className="zp-font-mono">{activeCode ? buttonName(activeCode) : "RELEASE TO STOP"}</span>
         </div>
       </div>
       <p className="text-center text-[14px] leading-4" style={{ color: "var(--text-muted)" }}>
-        Slide the stick to steer. Tap A, B, Start, or Select for the rest.
+        Hold the stick on desktop or mobile to keep walking. Release to stop. Tap A, B, Start, or Select for the rest.
       </p>
     </div>
   );
@@ -913,7 +913,8 @@ export default function ZoPlaysPokemonPage() {
   const currentTheme = THEME_LOOKUP[themeId] || THEME_PRESETS[0];
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
   const visibleQueueCount = Math.max(queueCount, queueDepth);
-  const controlsDisabled = visibleQueueCount > 0 || panelTab !== "play";
+  const playModeActive = panelTab === "play";
+  const controlsLocked = !playModeActive;
   const sharePreviewUrl =
     typeof window === "undefined" ? SHARE_URL_BASE : `${window.location.origin}${SHARE_URL_BASE}`;
 
@@ -1176,20 +1177,20 @@ export default function ZoPlaysPokemonPage() {
   };
 
   const tap = (code: string) => {
-    if (controlsDisabled || pendingTapCode) return;
+    if (controlsLocked || pendingTapCode) return;
     setError("");
     setPendingTapCode(code);
     void sendInput(code, "tap");
   };
 
   const beginPointerPress = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (controlsDisabled) return;
+    if (controlsLocked) return;
     event.preventDefault();
     tap(code);
   };
 
   const holdDpad = async (nextCode: string | null) => {
-    if (controlsDisabled) return;
+    if (controlsLocked) return;
     const currentCode = heldDpadCodeRef.current;
     if (currentCode === nextCode) return;
 
@@ -1522,11 +1523,11 @@ export default function ZoPlaysPokemonPage() {
 
   useEffect(() => {
     if (!heldDpadCode) return;
-    if (!controlsDisabled) return;
+    if (!controlsLocked) return;
     heldDpadCodeRef.current = null;
     setHeldDpadCode(null);
     void sendInput(heldDpadCode, "release");
-  }, [controlsDisabled, heldDpadCode]);
+  }, [controlsLocked, heldDpadCode]);
 
   useEffect(() => {
     if (!themeReady) return;
@@ -1728,16 +1729,16 @@ export default function ZoPlaysPokemonPage() {
     };
   }, []);
 
-  const recentLabel = pendingTapCode ? buttonName(pendingTapCode) : "Tap-ready";
+  const recentLabel = heldDpadCode ? `${buttonName(heldDpadCode)} held` : pendingTapCode ? `${buttonName(pendingTapCode)} queued` : "Ready";
   const isDraggingController = draggingController;
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
   const showFrameLoadingOverlay = frameLoading && (!frameSrc || visibleQueueCount > 0);
   const dpadActiveCode = heldDpadCode || pendingTapCode;
-  const localHoldLabel = heldDpadCode ? `Held ${buttonName(heldDpadCode)}` : pendingTapCode ? `Buffered ${buttonName(pendingTapCode)}` : "Idle";
+  const localHoldLabel = heldDpadCode ? `Holding ${buttonName(heldDpadCode)}` : pendingTapCode ? `Queued ${buttonName(pendingTapCode)}` : "Idle";
   const backendHoldLabel = heldButtons.length ? heldButtons.map((code) => buttonName(code)).join(" + ") : "none";
   const controlStateLabel =
-    panelTab !== "play" ? "Inputs paused" : visibleQueueCount > 0 ? `Queued ${visibleQueueCount}` : "Ready";
+    !playModeActive ? "Inputs paused" : heldDpadCode ? `Walking ${buttonName(heldDpadCode)}` : pendingTapCode ? `Queued ${buttonName(pendingTapCode)}` : visibleQueueCount > 0 ? `Waiting on frame ${visibleQueueCount}` : "Ready";
 
   const renderControllerContent = (isMobileView: boolean) => (
     <div
@@ -1784,7 +1785,7 @@ export default function ZoPlaysPokemonPage() {
 
       <div className="flex-1 overflow-y-auto min-h-0 mt-3 pr-1 select-none">
         <p className="text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-          {panelTab === "play" ? "Hold the joystick to keep moving. Release to stop." : "Settings pause button input until you return to Play."}
+          {playModeActive ? "Hold the joystick to keep moving. The backend hold state stays visible while the frame catches up." : "Settings pause button input until you return to Play."}
         </p>
 
         <div className="mt-4 grid gap-2 text-[13px] leading-4 sm:grid-cols-3">
@@ -1836,12 +1837,12 @@ export default function ZoPlaysPokemonPage() {
               <button
                 type="button"
                 onClick={() => tap("7")}
-                disabled={controlsDisabled}
+                disabled={controlsLocked}
                 className="rounded-full px-4 py-2 transition disabled:cursor-wait disabled:opacity-70"
                 style={{
                   background: "var(--shell-warm)",
                   color: "var(--text-strong)",
-                  boxShadow: controlsDisabled
+                  boxShadow: controlsLocked
                     ? "inset 2px 2px 0 rgba(0,0,0,0.12)"
                     : "inset 2px 2px 0 rgba(255,255,255,0.35), inset -2px -2px 0 rgba(0,0,0,0.14), 0 4px 0 rgba(0,0,0,0.18)",
                 }}
@@ -1854,7 +1855,7 @@ export default function ZoPlaysPokemonPage() {
               <div className={isMobileView ? "grid gap-5" : "grid gap-5 lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)] lg:items-center"}>
                 <div className="flex justify-center">
                   <div className="w-full max-w-[250px]">
-                    <JoystickPad activeCode={dpadActiveCode} disabled={controlsDisabled} onChange={(code) => void holdDpad(code)} />
+                    <JoystickPad activeCode={dpadActiveCode} disabled={controlsLocked} onChange={(code) => void holdDpad(code)} />
                   </div>
                 </div>
 
@@ -1865,7 +1866,7 @@ export default function ZoPlaysPokemonPage() {
                         key={button.code}
                         button={button}
                         active={pendingTapCode === button.code}
-                        disabled={controlsDisabled}
+                        disabled={controlsLocked}
                         onPress={beginPointerPress(button.code)}
                       />
                     ))}
@@ -1877,7 +1878,7 @@ export default function ZoPlaysPokemonPage() {
                         key={button.code}
                         label={button.label}
                         active={pendingTapCode === button.code}
-                        disabled={controlsDisabled}
+                        disabled={controlsLocked}
                         onClick={pressMenuButton(button.code)}
                       />
                     ))}

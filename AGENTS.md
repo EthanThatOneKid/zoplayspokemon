@@ -29,6 +29,7 @@ The live route already includes the retail theme presets, floating controller UI
 - Input route uses additional in-memory sliding-window limits keyed `__zoplayspokemon_input_limit` (429 responses with `Retry-After` when limits or mirrored queue ceiling trip)
 - Backend emulator worlds now persist per room on disk via PyBoy snapshots + `meta.json`
 - State route now long-polls and mirrors backend `inputVersion` / `frameVersion` metadata (no `room` query param; mirrors `_zoplayspokemon-global` room `main`)
+- Desktop stick holds are no longer blocked by in-flight queue activity; only leaving Play mode hard-stops local input
 
 ## Service
 
