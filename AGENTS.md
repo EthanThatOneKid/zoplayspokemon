@@ -30,6 +30,7 @@ The live route already includes the retail theme presets, floating controller UI
 - Backend emulator worlds now persist per room on disk via PyBoy snapshots + `meta.json`
 - State route now long-polls and mirrors backend `inputVersion` / `frameVersion` metadata (no `room` query param; mirrors `_zoplayspokemon-global` room `main`)
 - Desktop stick holds are no longer blocked by in-flight queue activity; only leaving Play mode hard-stops local input
+- Controller UI now surfaces a named nipple pad plus a visible buffer chip for inputs that are still in flight
 
 ## Service
 

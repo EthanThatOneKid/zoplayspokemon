@@ -8,6 +8,12 @@ type InputEvent = {
   timestamp: number;
 };
 
+type BufferedInput = {
+  action: "tap" | "press" | "release";
+  code: string;
+  startedAt: number;
+};
+
 type ButtonDef = {
   code: string;
   hint: string;
@@ -719,7 +725,7 @@ function MenuButton({
   );
 }
 
-function JoystickPad({
+function NipplePad({
   activeCode,
   disabled,
   onChange,
@@ -802,7 +808,7 @@ function JoystickPad({
             "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.26), transparent 38%), var(--shell-secondary)",
           touchAction: "none",
         }}
-        aria-label="Mobile joystick"
+        aria-label="Nipple pad"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
@@ -826,14 +832,14 @@ function JoystickPad({
           }}
         />
         <div className="absolute inset-x-0 top-4 text-center text-[9px]" style={{ color: "var(--text-soft)" }}>
-          <span className="zp-font-mono">HOLD OR DRAG TO MOVE</span>
+          <span className="zp-font-mono">NIPPLE PAD: HOLD OR DRAG TO MOVE</span>
         </div>
         <div className="absolute inset-x-0 bottom-4 text-center text-[9px]" style={{ color: "var(--text-muted)" }}>
           <span className="zp-font-mono">{activeCode ? buttonName(activeCode) : "RELEASE TO STOP"}</span>
         </div>
       </div>
       <p className="text-center text-[14px] leading-4" style={{ color: "var(--text-muted)" }}>
-        Hold the stick on desktop or mobile to keep walking. Release to stop. Tap A, B, Start, or Select for the rest.
+        Hold the nipple pad on desktop or mobile to keep walking. Release to stop. Tap A, B, Start, or Select for the rest.
       </p>
     </div>
   );
@@ -848,6 +854,7 @@ export default function ZoPlaysPokemonPage() {
   const [inputVersion, setInputVersion] = useState(0);
   const [lastFrameAt, setLastFrameAt] = useState(0);
   const [pendingTapCode, setPendingTapCode] = useState<string | null>(null);
+  const [bufferedInput, setBufferedInput] = useState<BufferedInput | null>(null);
   const [queueCount, setQueueCount] = useState(0);
   const [queueDepth, setQueueDepth] = useState(0);
   const [keyboardEnabled, setKeyboardEnabled] = useState(false);
@@ -1139,6 +1146,7 @@ export default function ZoPlaysPokemonPage() {
   };
 
   const sendInput = async (code: string, action: "tap" | "press" | "release") => {
+    setBufferedInput({ code, action, startedAt: Date.now() });
     notePendingInput();
     try {
       const res = await fetch("/api/zoplayspokemon-input", {
@@ -1168,9 +1176,11 @@ export default function ZoPlaysPokemonPage() {
         ? data.heldButtons.filter((button): button is string => typeof button === "string")
         : [];
       setHeldButtons(nextHeldButtons);
+      setBufferedInput(null);
       runBurstPoll(Math.max(nextInputVersion, inputVersionRef.current));
       return true;
     } catch {
+      setBufferedInput(null);
       failInput("Network issue while sending input");
       return false;
     }
@@ -1737,6 +1747,7 @@ export default function ZoPlaysPokemonPage() {
   const dpadActiveCode = heldDpadCode || pendingTapCode;
   const localHoldLabel = heldDpadCode ? `Holding ${buttonName(heldDpadCode)}` : pendingTapCode ? `Queued ${buttonName(pendingTapCode)}` : "Idle";
   const backendHoldLabel = heldButtons.length ? heldButtons.map((code) => buttonName(code)).join(" + ") : "none";
+  const bufferedLabel = bufferedInput ? `${buttonName(bufferedInput.code)} ${bufferedInput.action}` : "none";
   const controlStateLabel =
     !playModeActive ? "Inputs paused" : heldDpadCode ? `Walking ${buttonName(heldDpadCode)}` : pendingTapCode ? `Queued ${buttonName(pendingTapCode)}` : visibleQueueCount > 0 ? `Waiting on frame ${visibleQueueCount}` : "Ready";
 
@@ -1803,6 +1814,17 @@ export default function ZoPlaysPokemonPage() {
           </div>
         </div>
 
+        <div className="mt-3 grid gap-2 text-[13px] leading-4 sm:grid-cols-2">
+          <div className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+            <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>BUFFER</span>
+            <div className="mt-1">{bufferedLabel}</div>
+          </div>
+          <div className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+            <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>NIPPLE</span>
+            <div className="mt-1">{heldDpadCode ? buttonName(heldDpadCode) : "center"}</div>
+          </div>
+        </div>
+
         <div className="mt-4 flex items-center justify-between gap-3">
           <div className="rounded-full px-3 py-1 text-[14px] leading-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
             {currentTheme.name}
@@ -1855,7 +1877,7 @@ export default function ZoPlaysPokemonPage() {
               <div className={isMobileView ? "grid gap-5" : "grid gap-5 lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)] lg:items-center"}>
                 <div className="flex justify-center">
                   <div className="w-full max-w-[250px]">
-                    <JoystickPad activeCode={dpadActiveCode} disabled={controlsLocked} onChange={(code) => void holdDpad(code)} />
+                    <NipplePad activeCode={dpadActiveCode} disabled={controlsLocked} onChange={(code) => void holdDpad(code)} />
                   </div>
                 </div>
 
