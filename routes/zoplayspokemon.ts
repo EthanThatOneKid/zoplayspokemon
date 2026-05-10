@@ -652,38 +652,6 @@ function buildThemeStyle(theme: ThemePreset): CSSProperties {
   } as CSSProperties;
 }
 
-function DpadButton({
-  active,
-  disabled,
-  label,
-  onPress,
-}: {
-  active: boolean;
-  disabled: boolean;
-  label: string;
-  onPress: PointerEventHandler<HTMLButtonElement>;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onPointerDown={onPress}
-      onContextMenu={(event) => event.preventDefault()}
-      className="relative flex h-16 w-16 items-center justify-center rounded-[10px] border border-black/30 text-[12px] text-[#f5f5da] transition disabled:cursor-wait disabled:opacity-70"
-      style={{
-        touchAction: "none",
-        background: active ? "var(--dpad-pressed)" : "var(--dpad)",
-        boxShadow: active
-          ? "inset 3px 3px 0 rgba(0,0,0,0.45), inset -2px -2px 0 rgba(255,255,255,0.08)"
-          : "inset 3px 3px 0 var(--dpad-highlight), inset -3px -3px 0 rgba(0,0,0,0.55), 0 5px 0 rgba(0,0,0,0.25)",
-        transform: active ? "translateY(2px)" : "translateY(0)",
-      }}
-    >
-      <span className="zp-font-mono text-[10px]">{label}</span>
-    </button>
-  );
-}
-
 function ActionButton({
   active,
   button,
@@ -904,6 +872,7 @@ export default function ZoPlaysPokemonPage() {
   const [panelTab, setPanelTab] = useState<ControlPanelTab>("play");
   const [playerName, setPlayerName] = useState("guest");
   const [heldDpadCode, setHeldDpadCode] = useState<string | null>(null);
+  const [heldButtons, setHeldButtons] = useState<string[]>([]);
 
   const [draggingController, setDraggingController] = useState(false);
   const [draggingActivity, setDraggingActivity] = useState(false);
@@ -939,7 +908,7 @@ export default function ZoPlaysPokemonPage() {
   const gameDragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const gameResizeStateRef = useRef<{ startWidth: number; startHeight: number; startX: number; startY: number; pointerId: number } | null>(null);
 
-  const dpadPointerRef = useRef<{ pointerId: number; code: string | null } | null>(null);
+  const heldDpadCodeRef = useRef<string | null>(null);
 
   const currentTheme = THEME_LOOKUP[themeId] || THEME_PRESETS[0];
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
@@ -1194,6 +1163,10 @@ export default function ZoPlaysPokemonPage() {
         setFrameVersion(nextFrameVersion);
       }
       setQueueDepth(Math.max(0, nextQueueDepth));
+      const nextHeldButtons = Array.isArray(data.heldButtons)
+        ? data.heldButtons.filter((button): button is string => typeof button === "string")
+        : [];
+      setHeldButtons(nextHeldButtons);
       runBurstPoll(Math.max(nextInputVersion, inputVersionRef.current));
       return true;
     } catch {
@@ -1215,67 +1188,26 @@ export default function ZoPlaysPokemonPage() {
     tap(code);
   };
 
-  const pickDpadCodeFromPointer = (event: ReactPointerEvent, rect: DOMRect): string | null => {
-    const x = event.clientX;
-    const y = event.clientY;
-    const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-    if (!inside) return null;
-
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = x - cx;
-    const dy = y - cy;
-    const deadzone = Math.min(rect.width, rect.height) * 0.16;
-    if (Math.hypot(dx, dy) < deadzone) return null;
-
-    if (Math.abs(dx) > Math.abs(dy)) {
-      return dx > 0 ? "0" : "1";
-    }
-    return dy > 0 ? "3" : "2";
-  };
-
   const holdDpad = async (nextCode: string | null) => {
     if (controlsDisabled) return;
-    const currentCode = dpadPointerRef.current?.code ?? null;
+    const currentCode = heldDpadCodeRef.current;
     if (currentCode === nextCode) return;
 
     setError("");
 
     if (currentCode) {
-      await sendInput(currentCode, "release");
+      const released = await sendInput(currentCode, "release");
+      if (!released) return;
     }
-    dpadPointerRef.current = dpadPointerRef.current ? { ...dpadPointerRef.current, code: nextCode } : { pointerId: -1, code: nextCode };
+    heldDpadCodeRef.current = nextCode;
     setHeldDpadCode(nextCode);
     if (nextCode) {
-      await sendInput(nextCode, "press");
+      const pressed = await sendInput(nextCode, "press");
+      if (!pressed) {
+        heldDpadCodeRef.current = null;
+        setHeldDpadCode(null);
+      }
     }
-  };
-
-  const beginDpadPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (controlsDisabled) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const code = pickDpadCodeFromPointer(event, rect);
-    dpadPointerRef.current = { pointerId: event.pointerId, code: null };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-    void holdDpad(code);
-  };
-
-  const moveDpadPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const state = dpadPointerRef.current;
-    if (!state || state.pointerId !== event.pointerId) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const code = pickDpadCodeFromPointer(event, rect);
-    event.preventDefault();
-    void holdDpad(code);
-  };
-
-  const endDpadPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const state = dpadPointerRef.current;
-    if (!state || state.pointerId !== event.pointerId) return;
-    dpadPointerRef.current = null;
-    event.preventDefault();
-    void holdDpad(null);
   };
 
   const pressMenuButton = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1591,7 +1523,7 @@ export default function ZoPlaysPokemonPage() {
   useEffect(() => {
     if (!heldDpadCode) return;
     if (!controlsDisabled) return;
-    dpadPointerRef.current = null;
+    heldDpadCodeRef.current = null;
     setHeldDpadCode(null);
     void sendInput(heldDpadCode, "release");
   }, [controlsDisabled, heldDpadCode]);
@@ -1802,6 +1734,10 @@ export default function ZoPlaysPokemonPage() {
   const menuButtons = BUTTONS.filter((button) => button.kind === "menu");
   const showFrameLoadingOverlay = frameLoading && (!frameSrc || visibleQueueCount > 0);
   const dpadActiveCode = heldDpadCode || pendingTapCode;
+  const localHoldLabel = heldDpadCode ? `Held ${buttonName(heldDpadCode)}` : pendingTapCode ? `Buffered ${buttonName(pendingTapCode)}` : "Idle";
+  const backendHoldLabel = heldButtons.length ? heldButtons.map((code) => buttonName(code)).join(" + ") : "none";
+  const controlStateLabel =
+    panelTab !== "play" ? "Inputs paused" : visibleQueueCount > 0 ? `Queued ${visibleQueueCount}` : "Ready";
 
   const renderControllerContent = (isMobileView: boolean) => (
     <div
@@ -1848,12 +1784,23 @@ export default function ZoPlaysPokemonPage() {
 
       <div className="flex-1 overflow-y-auto min-h-0 mt-3 pr-1 select-none">
         <p className="text-[15px] leading-4" style={{ color: "var(--text-muted)" }}>
-          {panelTab === "play"
-            ? isMobileView
-              ? "Use the joystick to steer on mobile."
-              : "Drag the deck wherever it fits your screen."
-            : "Settings pause button input until you return to Play."}
+          {panelTab === "play" ? "Hold the joystick to keep moving. Release to stop." : "Settings pause button input until you return to Play."}
         </p>
+
+        <div className="mt-4 grid gap-2 text-[13px] leading-4 sm:grid-cols-3">
+          <div className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+            <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>LOCAL</span>
+            <div className="mt-1">{localHoldLabel}</div>
+          </div>
+          <div className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+            <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>BACKEND</span>
+            <div className="mt-1">{backendHoldLabel}</div>
+          </div>
+          <div className="rounded-[14px] px-3 py-2" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
+            <span className="zp-font-mono text-[9px]" style={{ color: "var(--text-strong)" }}>STATE</span>
+            <div className="mt-1">{controlStateLabel}</div>
+          </div>
+        </div>
 
         <div className="mt-4 flex items-center justify-between gap-3">
           <div className="rounded-full px-3 py-1 text-[14px] leading-4" style={{ background: "var(--chip-soft)", color: "var(--text-soft)" }}>
@@ -1904,15 +1851,15 @@ export default function ZoPlaysPokemonPage() {
             </div>
 
             <div className="mt-5">
-              {isMobileView ? (
-                <div className="grid gap-5">
-                  <div className="flex justify-center">
-                    <div className="w-full max-w-[220px]">
-                      <JoystickPad activeCode={dpadActiveCode} disabled={controlsDisabled} onChange={(code) => void holdDpad(code)} />
-                    </div>
+              <div className={isMobileView ? "grid gap-5" : "grid gap-5 lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)] lg:items-center"}>
+                <div className="flex justify-center">
+                  <div className="w-full max-w-[250px]">
+                    <JoystickPad activeCode={dpadActiveCode} disabled={controlsDisabled} onChange={(code) => void holdDpad(code)} />
                   </div>
+                </div>
 
-                  <div className="flex items-center justify-center gap-4">
+                <div className="grid gap-4">
+                  <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-start">
                     {actionButtons.map((button) => (
                       <ActionButton
                         key={button.code}
@@ -1923,54 +1870,20 @@ export default function ZoPlaysPokemonPage() {
                       />
                     ))}
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-4">
-                  <div
-                    className="grid grid-cols-3 gap-2 rounded-[22px] p-3"
-                    style={{ background: "var(--shell-secondary)", touchAction: "none" }}
-                    onPointerDown={beginDpadPointer}
-                    onPointerMove={moveDpadPointer}
-                    onPointerUp={endDpadPointer}
-                    onPointerCancel={endDpadPointer}
-                    onContextMenu={(event) => event.preventDefault()}
-                  >
-                    <div />
-                    <DpadButton label="UP" active={dpadActiveCode === "2"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                    <div />
-                    <DpadButton label="LEFT" active={dpadActiveCode === "1"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                    <div className="rounded-[10px]" style={{ background: "var(--shell-dark)" }} />
-                    <DpadButton label="RIGHT" active={dpadActiveCode === "0"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                    <div />
-                    <DpadButton label="DOWN" active={dpadActiveCode === "3"} disabled={controlsDisabled} onPress={(event) => event.preventDefault()} />
-                    <div />
-                  </div>
 
-                  <div className="flex -rotate-12 flex-col items-center gap-4">
-                    {actionButtons.map((button) => (
-                      <ActionButton
+                  <div className="flex flex-wrap items-center justify-center gap-4 lg:justify-start">
+                    {menuButtons.map((button) => (
+                      <MenuButton
                         key={button.code}
-                        button={button}
+                        label={button.label}
                         active={pendingTapCode === button.code}
                         disabled={controlsDisabled}
-                        onPress={beginPointerPress(button.code)}
+                        onClick={pressMenuButton(button.code)}
                       />
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-
-            <div className="mt-5 flex items-center justify-center gap-4">
-              {menuButtons.map((button) => (
-                <MenuButton
-                  key={button.code}
-                  label={button.label}
-                  active={pendingTapCode === button.code}
-                  disabled={controlsDisabled}
-                  onClick={pressMenuButton(button.code)}
-                />
-              ))}
+              </div>
             </div>
 
             <div className="mt-4 grid gap-2 text-[14px] leading-4 sm:grid-cols-2" style={{ color: "var(--text-soft)" }}>
