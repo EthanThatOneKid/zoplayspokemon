@@ -1468,49 +1468,6 @@ export default function ZoPlaysPokemonPage() {
     };
   }, [keyboardEnabled, panelTab, room]);
 
-  useEffect(() => {
-    burstPollIdRef.current += 1;
-    if (heldDpadCode) {
-      dpadPointerRef.current = null;
-      setHeldDpadCode(null);
-      void sendInput(heldDpadCode, "release");
-    }
-    frameVersionRef.current = 0;
-    inputVersionRef.current = 0;
-    lastFrameAtRef.current = 0;
-    frameHashRef.current = "";
-    frameEtagRef.current = null;
-    frameFetchIdRef.current += 1;
-    updatedAtRef.current = Date.now();
-    hasFrameRef.current = false;
-    setHasFrame(false);
-    setEvents([]);
-    if (frameObjectUrlRef.current) {
-      URL.revokeObjectURL(frameObjectUrlRef.current);
-      frameObjectUrlRef.current = null;
-    }
-    setFrameSrc("");
-    setFrameVersion(0);
-    setInputVersion(0);
-    setLastFrameAt(0);
-    setQueueDepth(0);
-    clearPendingInput();
-    continueHeldKeyboardTap();
-    frameLoadingRef.current = true;
-    setFrameLoading(true);
-    setPanelTab("play");
-    void refreshFrame(true);
-  }, [room]);
-
-  useEffect(() => {
-    return () => {
-      frameFetchIdRef.current += 1;
-      if (frameObjectUrlRef.current) {
-        URL.revokeObjectURL(frameObjectUrlRef.current);
-      }
-    };
-  }, []);
-
   const recentLabel = pendingTapCode ? buttonName(pendingTapCode) : "Tap-ready";
   const isDraggingController = draggingController;
   const actionButtons = BUTTONS.filter((button) => button.kind === "action");
@@ -2273,6 +2230,10 @@ export default function ZoPlaysPokemonPage() {
           </div>
         ) : null}
       </div>
+      <div className="mt-2 text-[10px] zp-font-mono" style={{ color: "var(--text-muted)" }}>
+        {controlsSummary}
+      </div>
+      {renderMemoryStatus()}
     </div>
   );
 }
