@@ -563,11 +563,11 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function getEstimatedControllerSize(minimized: boolean): { height: number; width: number } {
-  return minimized ? { width: 236, height: 72 } : { width: 392, height: 560 };
+  return minimized ? { width: 220, height: 68 } : { width: 340, height: 520 };
 }
 
 function getEstimatedActivitySize(minimized: boolean): { height: number; width: number } {
-  return minimized ? { width: 250, height: 72 } : { width: 352, height: 420 };
+  return minimized ? { width: 230, height: 68 } : { width: 320, height: 392 };
 }
 
 function getDefaultControllerPosition(minimized: boolean): Position {
@@ -2165,7 +2165,7 @@ export default function ZoPlaysPokemonPage() {
               left: controllerPosition.x,
               top: controllerPosition.y,
               maxWidth: "calc(100vw - 24px)",
-              width: controllerMinimized ? "236px" : "392px",
+              width: controllerMinimized ? "220px" : "340px",
             }}
           >
             {controllerMinimized ? (
@@ -2217,7 +2217,7 @@ export default function ZoPlaysPokemonPage() {
               left: activityPosition.x,
               top: activityPosition.y,
               maxWidth: "calc(100vw - 24px)",
-              width: activityMinimized ? "250px" : "352px",
+              width: activityMinimized ? "230px" : "320px",
             }}
           >
             {activityMinimized ? (
