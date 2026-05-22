@@ -127,6 +127,10 @@ function roomPlayerNameStorageKey(room: string): string {
   return `zoplayspokemon.playerName.${room}`;
 }
 
+function keyboardExtrasStorageKey(room: string, playerName: string): string {
+  return `zoplayspokemon.keyboardExtras.${room}.${playerName.trim().toLowerCase() || "guest"}`;
+}
+
 const THEME_PRESETS: ThemePreset[] = [
   {
     id: "atomic-purple",
@@ -787,6 +791,8 @@ export default function ZoPlaysPokemonPage() {
   const controllerDragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const activityDragStateRef = useRef<{ offsetX: number; offsetY: number; pointerId: number } | null>(null);
   const dpadPointerRef = useRef<{ pointerId: number; code: string | null } | null>(null);
+  const keyboardHeldCodeRef = useRef<string | null>(null);
+  const keyboardExtrasRef = useRef(false);
 
   const currentTheme = THEME_LOOKUP[themeId] || THEME_PRESETS[0];
   const rootStyle = useMemo(() => buildThemeStyle(currentTheme), [currentTheme]);
@@ -882,6 +888,13 @@ export default function ZoPlaysPokemonPage() {
        hasFrameRef.current = true;
        setHasFrame(true);
        clearPendingInput();
+       armHeldKeyboardTap();
+       const heldCode = keyboardHeldCodeRef.current;
+       if (heldCode && panelTab === "play" && keyboardEnabled) {
+         setError("");
+         setPendingTapCode(heldCode);
+         void sendInput(heldCode, "tap");
+       }
      } catch {
        if (frameFetchIdRef.current !== requestId) return;
        frameLoadingRef.current = false;
@@ -999,6 +1012,7 @@ export default function ZoPlaysPokemonPage() {
       }
       setQueueDepth(Math.max(0, nextQueueDepth));
       runBurstPoll(Math.max(nextInputVersion, inputVersionRef.current));
+      armHeldKeyboardTap();
       return true;
     } catch {
       failInput("Network issue while sending input");
@@ -1011,6 +1025,24 @@ export default function ZoPlaysPokemonPage() {
     setError("");
     setPendingTapCode(code);
     void sendInput(code, "tap");
+  };
+
+  const continueHeldKeyboardTap = () => {
+    const heldCode = keyboardHeldCodeRef.current;
+    if (!heldCode) return;
+    if (panelTab !== "play" || !keyboardEnabled) return;
+    if (pendingTapCode) return;
+    setError("");
+    setPendingTapCode(heldCode);
+    void sendInput(heldCode, "tap");
+  };
+
+  const armHeldKeyboardTap = () => {
+    const heldCode = keyboardHeldCodeRef.current;
+    if (!heldCode) return;
+    if (panelTab !== "play" || !keyboardEnabled) return;
+    if (pendingTapCode) return;
+    window.setTimeout(() => continueHeldKeyboardTap(), 0);
   };
 
   const beginPointerPress = (code: string) => (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -1147,6 +1179,7 @@ export default function ZoPlaysPokemonPage() {
       hasFrameRef.current = true;
       setHasFrame(true);
       refreshFrame();
+      armHeldKeyboardTap();
     }
   };
 
@@ -1281,6 +1314,20 @@ export default function ZoPlaysPokemonPage() {
   }, [playerName, room]);
 
   useEffect(() => {
+    if (!themeReady) return;
+    const key = keyboardExtrasStorageKey(room, playerName);
+    const stored = window.localStorage.getItem(key);
+    const nextEnabled = stored === null ? true : stored === "true";
+    keyboardExtrasRef.current = nextEnabled;
+    setKeyboardEnabled(nextEnabled);
+  }, [playerName, room, themeReady]);
+
+  useEffect(() => {
+    if (!themeReady) return;
+    window.localStorage.setItem(keyboardExtrasStorageKey(room, playerName), keyboardEnabled ? "true" : "false");
+  }, [keyboardEnabled, playerName, room, themeReady]);
+
+  useEffect(() => {
     if (!heldDpadCode) return;
     if (!controlsDisabled) return;
     dpadPointerRef.current = null;
@@ -1389,14 +1436,32 @@ export default function ZoPlaysPokemonPage() {
       const code = KEY_TO_CODE[event.key];
       if (!code) return;
       event.preventDefault();
-      if (event.repeat) return;
+      keyboardHeldCodeRef.current = code;
       tap(code);
+      armHeldKeyboardTap();
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      const code = KEY_TO_CODE[event.key];
+      if (!code) return;
+      if (keyboardHeldCodeRef.current === code) {
+        keyboardHeldCodeRef.current = null;
+      }
+    };
+
+    const onBlur = () => {
+      keyboardHeldCodeRef.current = null;
     };
 
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+      keyboardHeldCodeRef.current = null;
       if (pendingTimeoutRef.current !== null) {
         window.clearTimeout(pendingTimeoutRef.current);
       }
@@ -1430,6 +1495,7 @@ export default function ZoPlaysPokemonPage() {
     setLastFrameAt(0);
     setQueueDepth(0);
     clearPendingInput();
+    continueHeldKeyboardTap();
     frameLoadingRef.current = true;
     setFrameLoading(true);
     setPanelTab("play");
@@ -1648,13 +1714,13 @@ export default function ZoPlaysPokemonPage() {
               title="Opt in if you want keyboard controls."
             >
               <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
-                KEYBOARD: {keyboardEnabled ? "ON" : "OFF"}
+                EXTRA KEYS: {keyboardEnabled ? "ON" : "OFF"}
               </div>
               <div className="mt-2 text-[17px]" style={{ color: "var(--text-strong)" }}>
-                {keyboardEnabled ? "Keyboard play is armed." : "Keyboard play is blocked."}
+                {keyboardEnabled ? "Extra keys are enabled." : "Extra keys are disabled."}
               </div>
               <div className="mt-2" style={{ color: "var(--text-muted)" }}>
-                Opt in to avoid accidental inputs while browsing.
+                Saved in localStorage per room and display name.
               </div>
             </button>
 

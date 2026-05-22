@@ -33,8 +33,18 @@ type RoomInfo = {
 
 const SERVICE_URL = "https://zo-gameboy-etok.zocomputer.io";
 const KEY = "__zoplayspokemon_state";
-const LONG_POLL_INTERVAL_MS = 250;
+const LONG_POLL_INTERVAL_MS = 100;
 const LONG_POLL_TIMEOUT_MS = 20_000;
+
+async function fetchMemorySnapshot(room: string): Promise<unknown> {
+  const response = await fetch(`${SERVICE_URL}/memory?room=${encodeURIComponent(room)}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    return { ready: false };
+  }
+  return response.json();
+}
 
 function getState(room: string): ShareState {
   const g = globalThis as typeof globalThis & { [KEY]?: Record<string, ShareState> };
@@ -217,6 +227,8 @@ export default async (c: Context) => {
     await syncFromService(room, state);
   }
 
+  const memory = await fetchMemorySnapshot(room);
+
   return c.json({
     room,
     streamUrl: `/api/zoplayspokemon-frame`,
@@ -239,5 +251,6 @@ export default async (c: Context) => {
     lastInputAt: state.lastInputAt,
     lastFrameAt: state.lastFrameAt,
     events: state.events.slice(-20).reverse(),
+    memory,
   });
 };

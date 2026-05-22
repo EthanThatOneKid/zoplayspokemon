@@ -31,10 +31,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("zo-gameboy")
 WARMUP_FRAMES = 480
 ROOM_FPS = 30
-TAP_HOLD_FRAMES = 8
+TAP_HOLD_FRAMES = 6
 TAP_SETTLE_FRAMES = {
-    "right": 3, "left": 3, "up": 3, "down": 3,
-    "a": 12, "b": 10, "select": 10, "start": 14,
+    "right": 2, "left": 2, "up": 2, "down": 2,
+    "a": 8, "b": 7, "select": 7, "start": 10,
 }
 HELD_SETTLE_FRAMES = {
     "right": 2, "left": 2, "up": 2, "down": 2,
@@ -65,6 +65,37 @@ SNAPSHOT_FILENAME = "snapshot.state"
 META_FILENAME = "meta.json"
 SAVE_DEBOUNCE_SECONDS = 3.0
 SAVE_CHECKPOINT_SECONDS = 60.0
+LOOKUP_PATH = Path(__file__).with_name("pokecrystal_lookup.json")
+
+if LOOKUP_PATH.exists():
+    try:
+        LOOKUP_DATA = json.loads(LOOKUP_PATH.read_text())
+    except Exception:
+        logger.exception("failed to load lookup data")
+        LOOKUP_DATA = {"items": [], "pokemon": []}
+else:
+    LOOKUP_DATA = {"items": [], "pokemon": []}
+
+POKEMON_NAMES = LOOKUP_DATA.get("pokemon", [])
+ITEM_NAMES = LOOKUP_DATA.get("items", [])
+
+WRAM = {
+    "party_count": 0xDCD7,
+    "party_species": 0xDCD8,
+    "party_mon1": 0xDCDF,
+    "num_items": 0xD892,
+    "items": 0xD893,
+    "num_key_items": 0xD8BC,
+    "key_items": 0xD8BD,
+    "num_balls": 0xD8D7,
+    "balls": 0xD8D8,
+    "num_pc_items": 0xD8F1,
+    "pc_items": 0xD8F2,
+}
+PARTY_MON_STRUCT_LENGTH = 48
+PARTY_NICKNAME_LENGTH = 11
+ITEM_NAME_LENGTH = 13
+MAX_PARTY = 6
 
 BUTTON_MAP = {
     "0": "right", "1": "left", "2": "up", "3": "down",
@@ -90,6 +121,99 @@ def sha256_file(path: str | Path) -> str:
 
 
 ROM_SHA256 = sha256_file(args.rom)
+
+def read_u8(pyboy: PyBoy, addr: int) -> int:
+    return int(pyboy.memory[addr]) & 0xFF
+
+def read_u16(pyboy: PyBoy, addr: int) -> int:
+    return read_u8(pyboy, addr) | (read_u8(pyboy, addr + 1) << 8)
+
+def read_bytes(pyboy: PyBoy, addr: int, length: int) -> list[int]:
+    return [read_u8(pyboy, addr + i) for i in range(length)]
+
+def decode_nul_terminated_name(raw: list[int]) -> str:
+    out = []
+    for b in raw:
+        if b in (0x50, 0x00):
+            break
+        if 0 < b < len(ITEM_NAMES):
+            out.append(chr(b))
+        else:
+            out.append(f"{b:02X}")
+    return "".join(out).strip() or "?"
+
+def item_name_from_id(item_id: int) -> str:
+    if 0 <= item_id < len(ITEM_NAMES):
+        name = ITEM_NAMES[item_id]
+        return name or f"ITEM_{item_id:02X}"
+    return f"ITEM_{item_id:02X}"
+
+def pokemon_name_from_id(species_id: int) -> str:
+    if 0 <= species_id < len(POKEMON_NAMES):
+        name = POKEMON_NAMES[species_id]
+        return name or f"MON_{species_id:02X}"
+    return f"MON_{species_id:02X}"
+
+def parse_party(pyboy: PyBoy) -> list[dict]:
+    count = min(MAX_PARTY, read_u8(pyboy, WRAM["party_count"]))
+    species = read_bytes(pyboy, WRAM["party_species"], MAX_PARTY)
+    party = []
+    for i in range(count):
+        base = WRAM["party_mon1"] + i * PARTY_MON_STRUCT_LENGTH
+        species_id = species[i] if i < len(species) else 0
+        nickname = decode_nul_terminated_name(read_bytes(pyboy, base + 0x17, PARTY_NICKNAME_LENGTH))
+        item_id = read_u8(pyboy, base + 0x01)
+        level = read_u8(pyboy, base + 0x20)
+        hp = read_u16(pyboy, base + 0x19)
+        max_hp = read_u16(pyboy, base + 0x1B)
+        party.append({
+            "slot": i + 1,
+            "speciesId": species_id,
+            "species": pokemon_name_from_id(species_id),
+            "nickname": nickname,
+            "itemId": item_id,
+            "item": item_name_from_id(item_id) if item_id else "",
+            "level": level,
+            "hp": hp,
+            "maxHp": max_hp,
+        })
+    return party
+
+def parse_pocket(pyboy: PyBoy, count_addr: int, data_addr: int, slot_bytes: int, value_name: str) -> list[dict]:
+    count = read_u8(pyboy, count_addr)
+    items = []
+    raw = read_bytes(pyboy, data_addr, slot_bytes * 20)
+    for i in range(count):
+        if slot_bytes == 2:
+            item_id = raw[i * 2]
+            qty = raw[i * 2 + 1]
+        else:
+            item_id = raw[i]
+            qty = 1
+        items.append({
+            "slot": i + 1,
+            "itemId": item_id,
+            "item": item_name_from_id(item_id),
+            "quantity": qty,
+        })
+    return items
+
+def build_memory_snapshot(room: dict) -> dict:
+    pyboy = room.get("pyboy")
+    if pyboy is None:
+        return {"room": room.get("name", GLOBAL_ROOM_NAME), "ready": False}
+    return {
+        "room": room["name"],
+        "ready": True,
+        "ticks": room["ticks"],
+        "savedAt": room["saved_at"],
+        "hasSnapshot": room["has_snapshot"],
+        "party": parse_party(pyboy),
+        "items": parse_pocket(pyboy, WRAM["num_items"], WRAM["items"], 2, "items"),
+        "keyItems": parse_pocket(pyboy, WRAM["num_key_items"], WRAM["key_items"], 1, "keyItems"),
+        "balls": parse_pocket(pyboy, WRAM["num_balls"], WRAM["balls"], 2, "balls"),
+        "pcItems": parse_pocket(pyboy, WRAM["num_pc_items"], WRAM["pc_items"], 2, "pcItems"),
+    }
 
 
 def room_storage_name(room_name: str) -> str:
@@ -483,6 +607,13 @@ class Handler(BaseHTTPRequestHandler):
                     for n, r in rooms.items()
                 }
             self.respond_json(info)
+            return
+
+        if path == "/memory":
+            room = get_room(qs.get("room", ["main"])[0])
+            with room["lock"]:
+                snapshot = build_memory_snapshot(room)
+            self.respond_json(snapshot)
             return
 
         self.send_error(404)
