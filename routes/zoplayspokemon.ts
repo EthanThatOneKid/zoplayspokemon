@@ -803,6 +803,12 @@ export default function ZoPlaysPokemonPage() {
       ? `${SHARE_URL_BASE}?room=${encodeURIComponent(room)}`
       : `${window.location.origin}${SHARE_URL_BASE}?room=${encodeURIComponent(room)}`;
 
+  const latestState = useMemo(() => {
+    return events.length > 0 ? events[events.length - 1] : null;
+  }, [events]);
+
+  const memory = latestState?.memory as Record<string, unknown> | undefined;
+
   const measureController = (minimized: boolean) => {
     const rect = controllerRef.current?.getBoundingClientRect();
     if (rect?.width && rect?.height) {
@@ -1976,6 +1982,75 @@ export default function ZoPlaysPokemonPage() {
       </div>
     </div>
   );
+
+  const renderMemoryStatus = () => {
+    if (!memory || typeof memory !== "object") {
+      return (
+        <div className="mt-3 rounded-[18px] px-4 py-4" style={{ background: "var(--panel-soft)" }}>
+          <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+            MEMORY
+          </div>
+          <div className="mt-2 text-[14px]" style={{ color: "var(--text-muted)" }}>
+            Waiting for a memory snapshot.
+          </div>
+        </div>
+      );
+    }
+
+    const snapshot = memory as Record<string, unknown>;
+    const location = snapshot.location as Record<string, unknown> | undefined;
+    const party = Array.isArray(snapshot.party) ? snapshot.party : [];
+    const bagItems = Array.isArray(snapshot.items) ? snapshot.items : [];
+    const keyItems = Array.isArray(snapshot.keyItems) ? snapshot.keyItems : [];
+    const balls = Array.isArray(snapshot.balls) ? snapshot.balls : [];
+    const pcItems = Array.isArray(snapshot.pcItems) ? snapshot.pcItems : [];
+
+    const renderList = (items: unknown[]) =>
+      items.length > 0
+        ? items.slice(0, 6).map((item, index) => {
+            const value = typeof item === "string" ? item : JSON.stringify(item);
+            return (
+              <li key={index} className="truncate">
+                {value}
+              </li>
+            );
+          })
+        : [<li key="empty" className="italic opacity-70">None</li>];
+
+    return (
+      <div className="mt-3 rounded-[18px] px-4 py-4" style={{ background: "var(--panel-soft)" }}>
+        <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>
+          MEMORY
+        </div>
+        <div className="mt-2 grid gap-3 text-[13px]" style={{ color: "var(--text-strong)" }}>
+          <div>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>LOCATION</div>
+            <div>{typeof location?.landmark === "string" ? location.landmark : "Unknown"}</div>
+          </div>
+          <div>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>PARTY</div>
+            <ul className="mt-1 list-disc pl-5 text-[12px]">{renderList(party)}</ul>
+          </div>
+          <div>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>BAG ITEMS</div>
+            <ul className="mt-1 list-disc pl-5 text-[12px]">{renderList(bagItems)}</ul>
+          </div>
+          <div>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>KEY ITEMS</div>
+            <ul className="mt-1 list-disc pl-5 text-[12px]">{renderList(keyItems)}</ul>
+          </div>
+          <div>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>BALLS</div>
+            <ul className="mt-1 list-disc pl-5 text-[12px]">{renderList(balls)}</ul>
+          </div>
+          <div>
+            <div className="zp-font-mono text-[9px]" style={{ color: "var(--text-soft)" }}>PC ITEMS</div>
+            <ul className="mt-1 list-disc pl-5 text-[12px]">{renderList(pcItems)}</ul>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="zp-root min-h-screen" style={rootStyle}>
